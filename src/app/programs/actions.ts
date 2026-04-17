@@ -8,6 +8,7 @@ import {
   updateProgram,
   deleteProgram,
 } from "@/lib/data/programs";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 // ---------------------------------------------------------------------------
 // Types for form state
@@ -31,19 +32,19 @@ export async function uploadProgramAction(
 
   // Validate file presence
   if (!file || file.size === 0) {
-    return { success: false, error: "Ficheiro é obrigatório" };
+    return { success: false, error: "Ficheiro e obrigatorio" };
   }
 
   // Validate file extension
   const fileName = file.name;
   const ext = fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
   if (ext !== ".tp" && ext !== ".ls") {
-    return { success: false, error: "Apenas ficheiros .tp e .ls são aceites" };
+    return { success: false, error: "Apenas ficheiros .tp e .ls sao aceites" };
   }
 
   // Validate file size (50MB)
   if (file.size > 50 * 1024 * 1024) {
-    return { success: false, error: "Ficheiro demasiado grande (máximo 50MB)" };
+    return { success: false, error: "Ficheiro demasiado grande (maximo 50MB)" };
   }
 
   // Determine file_type from extension
@@ -73,15 +74,30 @@ export async function uploadProgramAction(
       if (!fieldErrors[key]) fieldErrors[key] = [];
       fieldErrors[key].push(issue.message);
     }
-    return { success: false, error: "Dados inválidos", fieldErrors };
+    return { success: false, error: "Dados invalidos", fieldErrors };
   }
 
-  // Mock file URL — in production this would be a Supabase Storage signed URL
-  const mockFileUrl = `/storage/programs/${Date.now()}-${fileName}`;
+  // Upload file to Supabase Storage
+  const supabase = await createServerSupabaseClient();
+  const storagePath = `${Date.now()}-${fileName}`;
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from("programs")
+    .upload(storagePath, file);
+
+  if (uploadError) {
+    return { success: false, error: `Erro ao fazer upload: ${uploadError.message}` };
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("programs")
+    .getPublicUrl(uploadData.path);
+  const fileUrl = urlData.publicUrl;
 
   try {
-    await createProgram(parsed.data, mockFileUrl);
+    await createProgram(parsed.data, fileUrl);
   } catch {
+    // Clean up uploaded file on DB insert failure
+    await supabase.storage.from("programs").remove([uploadData.path]);
     return { success: false, error: "Erro ao criar programa" };
   }
 
@@ -119,12 +135,12 @@ export async function updateProgramAction(
       if (!fieldErrors[key]) fieldErrors[key] = [];
       fieldErrors[key].push(issue.message);
     }
-    return { success: false, error: "Dados inválidos", fieldErrors };
+    return { success: false, error: "Dados invalidos", fieldErrors };
   }
 
   const updated = await updateProgram(id, parsed.data);
   if (!updated) {
-    return { success: false, error: "Programa não encontrado" };
+    return { success: false, error: "Programa nao encontrado" };
   }
 
   revalidatePath("/programs");
@@ -139,7 +155,7 @@ export async function updateProgramAction(
 export async function deleteProgramAction(id: string): Promise<ActionState> {
   const deleted = await deleteProgram(id);
   if (!deleted) {
-    return { success: false, error: "Programa não encontrado" };
+    return { success: false, error: "Programa nao encontrado" };
   }
 
   revalidatePath("/programs");

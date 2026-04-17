@@ -1,11 +1,10 @@
 /**
  * Dashboard data aggregation functions.
- * Server-side only — computes metrics from the in-memory store.
+ * Server-side only — computes metrics from Supabase data.
  */
 
 import type { PieceStatus } from "@/lib/types";
-import { getAllPieces, getProjects } from "@/lib/data/store";
-import { getRobots } from "@/lib/data/programs";
+import { getAllPieces, getProjects, getAllRobots } from "@/lib/data/store";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,8 +86,7 @@ function countWorkdays(start: Date, end: Date): number {
 export async function getRobotOccupancyAsync(
   period: "week" | "month"
 ): Promise<RobotOccupancyRow[]> {
-  const robots = await getRobots();
-  const pieces = getAllPieces();
+  const [robots, pieces] = await Promise.all([getAllRobots(), getAllPieces()]);
   const { start, end } = getDateRange(period);
   const workdays = countWorkdays(start, end);
   const totalSlotsPerRobot = workdays * 2;
@@ -131,12 +129,12 @@ const STATUS_CONFIG: Record<PieceStatus, { label: string; color: string }> = {
   backlog: { label: "Backlog", color: "#3B82F6" },
   programmed: { label: "Programada", color: "#8B5CF6" },
   allocated: { label: "Alocada", color: "#F97316" },
-  in_production: { label: "Em Produção", color: "#22C55E" },
-  completed: { label: "Concluída", color: "#6B7280" },
+  in_production: { label: "Em Producao", color: "#22C55E" },
+  completed: { label: "Concluida", color: "#6B7280" },
 };
 
-export function getPipelineCounts(): PipelineCount[] {
-  const pieces = getAllPieces();
+export async function getPipelineCounts(): Promise<PipelineCount[]> {
+  const pieces = await getAllPieces();
   const counts = new Map<PieceStatus, number>();
 
   for (const piece of pieces) {
@@ -163,9 +161,10 @@ export function getPipelineCounts(): PipelineCount[] {
 // Deadline Alerts
 // ---------------------------------------------------------------------------
 
-export function getDeadlineAlerts(daysAhead: number = 7): DeadlineAlert[] {
-  const projects = getProjects();
-  const pieces = getAllPieces();
+export async function getDeadlineAlerts(
+  daysAhead: number = 7
+): Promise<DeadlineAlert[]> {
+  const [projects, pieces] = await Promise.all([getProjects(), getAllPieces()]);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
@@ -212,8 +211,10 @@ export function getDeadlineAlerts(daysAhead: number = 7): DeadlineAlert[] {
 // Throughput (pieces completed per week)
 // ---------------------------------------------------------------------------
 
-export function getThroughput(weeks: number = 8): ThroughputWeek[] {
-  const pieces = getAllPieces();
+export async function getThroughput(
+  weeks: number = 8
+): Promise<ThroughputWeek[]> {
+  const pieces = await getAllPieces();
   const now = new Date();
 
   // Generate week boundaries going backwards

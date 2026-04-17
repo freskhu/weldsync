@@ -61,7 +61,7 @@ export async function createPieceAction(
   }
 
   // Check unique (project_id, reference)
-  const existing = getPieceByReference(projectId, result.data.reference);
+  const existing = await getPieceByReference(projectId, result.data.reference);
   if (existing) {
     return {
       success: false,
@@ -73,7 +73,7 @@ export async function createPieceAction(
     };
   }
 
-  dbCreatePiece({
+  await dbCreatePiece({
     project_id: result.data.project_id,
     reference: result.data.reference,
     description: result.data.description ?? null,
@@ -105,7 +105,7 @@ export async function updatePieceAction(
 
   if (!id) return { success: false, error: "ID da peca em falta." };
 
-  const piece = getPieceById(id);
+  const piece = await getPieceById(id);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   const raw = {
@@ -134,7 +134,7 @@ export async function updatePieceAction(
 
   // Check unique (project_id, reference) if reference changed
   if (result.data.reference && result.data.reference !== piece.reference) {
-    const existing = getPieceByReference(piece.project_id, result.data.reference);
+    const existing = await getPieceByReference(piece.project_id, result.data.reference);
     if (existing) {
       return {
         success: false,
@@ -147,7 +147,7 @@ export async function updatePieceAction(
     }
   }
 
-  dbUpdatePiece(id, {
+  await dbUpdatePiece(id, {
     ...(result.data.reference !== undefined && { reference: result.data.reference }),
     description: result.data.description ?? null,
     material: result.data.material ?? null,
@@ -175,13 +175,13 @@ export async function movePieceAction(
   pieceId: string,
   newStatus: PieceStatus
 ): Promise<ActionResult> {
-  if (!pieceId) return { success: false, error: "ID da peça em falta." };
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
   if (!VALID_STATUSES.includes(newStatus)) {
-    return { success: false, error: "Estado inválido." };
+    return { success: false, error: "Estado invalido." };
   }
 
-  const piece = dbMovePiece(pieceId, newStatus);
-  if (!piece) return { success: false, error: "Peça não encontrada." };
+  const piece = await dbMovePiece(pieceId, newStatus);
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
   return { success: true };
@@ -195,7 +195,7 @@ export async function deletePieceAction(
 
   if (!id) return { success: false, error: "ID da peca em falta." };
 
-  const result = dbDeletePiece(id);
+  const result = await dbDeletePiece(id);
   if (!result) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath(`/projects/${projectId}`);
@@ -209,7 +209,7 @@ export async function linkProgramToPiece(
   if (!pieceId) return { success: false, error: "ID da peca em falta." };
   if (!programId) return { success: false, error: "ID do programa em falta." };
 
-  const piece = dbLinkProgram(pieceId, programId);
+  const piece = await dbLinkProgram(pieceId, programId);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath(`/projects/${piece.project_id}`);
@@ -221,7 +221,7 @@ export async function unlinkProgramFromPiece(
 ): Promise<ActionResult> {
   if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
-  const piece = dbUnlinkProgram(pieceId);
+  const piece = await dbUnlinkProgram(pieceId);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath(`/projects/${piece.project_id}`);
@@ -231,10 +231,10 @@ export async function unlinkProgramFromPiece(
 // --- Allocation actions ---
 
 const allocateSchema = z.object({
-  pieceId: z.string().min(1, "ID da peça em falta."),
-  robotId: z.coerce.number().int().positive("Robot inválido."),
+  pieceId: z.string().min(1, "ID da peca em falta."),
+  robotId: z.coerce.number().int().positive("Robot invalido."),
   date: z.string().date(),
-  period: z.enum(["AM", "PM"], { error: "Período deve ser AM ou PM." }),
+  period: z.enum(["AM", "PM"], { error: "Periodo deve ser AM ou PM." }),
 });
 
 export async function allocatePieceAction(
@@ -260,8 +260,8 @@ export async function allocatePieceAction(
 
   const { pieceId, robotId, date, period } = result.data;
 
-  const piece = dbAllocatePiece(pieceId, robotId, date, period);
-  if (!piece) return { success: false, error: "Peça não encontrada." };
+  const piece = await dbAllocatePiece(pieceId, robotId, date, period);
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
   revalidatePath("/robots");
@@ -289,13 +289,13 @@ export async function allocatePieceDirectAction(
     return { success: false, fieldErrors };
   }
 
-  const piece = dbAllocatePiece(
+  const piece = await dbAllocatePiece(
     result.data.pieceId,
     result.data.robotId,
     result.data.date,
     result.data.period
   );
-  if (!piece) return { success: false, error: "Peça não encontrada." };
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/calendar");
   revalidatePath("/planning");
@@ -307,10 +307,10 @@ export async function deallocatePieceAction(
   formData: FormData
 ): Promise<ActionResult> {
   const pieceId = formData.get("pieceId") as string;
-  if (!pieceId) return { success: false, error: "ID da peça em falta." };
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
-  const piece = dbDeallocatePiece(pieceId);
-  if (!piece) return { success: false, error: "Peça não encontrada." };
+  const piece = await dbDeallocatePiece(pieceId);
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
   revalidatePath("/robots");

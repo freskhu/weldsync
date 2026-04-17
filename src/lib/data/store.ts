@@ -1,391 +1,195 @@
 /**
- * In-memory data store for development.
- * Structured to be easily swapped for Supabase queries later.
- * Each function mirrors what a Supabase query would return.
+ * Data access layer backed by Supabase.
+ * All functions are async and return data from the real database.
  */
 
-import type { Project, Piece } from "@/lib/types";
-
-// --- Seed data ---
-
-const seedProjects: Project[] = [
-  {
-    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    client_ref: "CRV-2024-001",
-    name: "Estrutura Nave Industrial",
-    client_name: "Construções Silva",
-    color: "#3B82F6",
-    deadline: "2026-05-30",
-    status: "active",
-    notes: "Projeto prioritário — entrega até fim de maio.",
-    created_at: "2026-03-10T08:00:00Z",
-    updated_at: "2026-04-01T10:00:00Z",
-  },
-  {
-    id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-    client_ref: "CRV-2024-002",
-    name: "Bancadas Aço Inox",
-    client_name: "Padaria Moderna",
-    color: "#10B981",
-    deadline: "2026-06-15",
-    status: "active",
-    notes: null,
-    created_at: "2026-03-15T09:00:00Z",
-    updated_at: "2026-03-15T09:00:00Z",
-  },
-  {
-    id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
-    client_ref: "CRV-2024-003",
-    name: "Escada Metálica",
-    client_name: "Câmara de Leiria",
-    color: "#F59E0B",
-    deadline: null,
-    status: "active",
-    notes: "Sem prazo definido, aguarda aprovação camarária.",
-    created_at: "2026-04-01T11:00:00Z",
-    updated_at: "2026-04-01T11:00:00Z",
-  },
-];
-
-const seedPieces: Piece[] = [
-  // --- Allocated / in_production pieces (visible on Gantt) ---
-  {
-    id: "p1a2b3c4-d5e6-7890-abcd-ef1234567890",
-    project_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    reference: "VIG-01",
-    description: "Viga principal HEB300",
-    material: "S355JR",
-    wps: "WPS-001",
-    quantity: 4,
-    weight_kg: 320,
-    estimated_hours: 8,
-    status: "allocated",
-    robot_id: 1,
-    scheduled_date: "2026-04-16",
-    scheduled_period: "AM",
-    urgent: false,
-    barcode: "VIG01-001",
-    program_id: null,
-    position: 0,
-    created_at: "2026-03-12T08:00:00Z",
-    updated_at: "2026-04-14T10:00:00Z",
-  },
-  {
-    id: "p2b3c4d5-e6f7-8901-bcde-f12345678901",
-    project_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    reference: "PIR-01",
-    description: "Pilar HEB200",
-    material: "S355JR",
-    wps: "WPS-001",
-    quantity: 8,
-    weight_kg: 180,
-    estimated_hours: 4,
-    status: "in_production",
-    robot_id: 2,
-    scheduled_date: "2026-04-15",
-    scheduled_period: "AM",
-    urgent: true,
-    barcode: "PIR01-001",
-    program_id: null,
-    position: 1,
-    created_at: "2026-03-12T08:30:00Z",
-    updated_at: "2026-04-15T08:00:00Z",
-  },
-  {
-    id: "p3c4d5e6-f7a8-9012-cdef-123456789012",
-    project_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    reference: "CHAP-01",
-    description: "Chapa de ligação 20mm",
-    material: "S275JR",
-    wps: "WPS-002",
-    quantity: 16,
-    weight_kg: 45,
-    estimated_hours: 2,
-    status: "allocated",
-    robot_id: 3,
-    scheduled_date: "2026-04-17",
-    scheduled_period: "PM",
-    urgent: false,
-    barcode: null,
-    program_id: null,
-    position: 2,
-    created_at: "2026-03-13T10:00:00Z",
-    updated_at: "2026-04-14T10:00:00Z",
-  },
-  {
-    id: "p4d5e6f7-a8b9-0123-defa-234567890123",
-    project_id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-    reference: "BANC-01",
-    description: "Bancada 2m aço inox 304",
-    material: "AISI 304",
-    wps: "WPS-003",
-    quantity: 3,
-    weight_kg: 85,
-    estimated_hours: 6,
-    status: "allocated",
-    robot_id: 4,
-    scheduled_date: "2026-04-20",
-    scheduled_period: "AM",
-    urgent: false,
-    barcode: "BANC01-001",
-    program_id: null,
-    position: 0,
-    created_at: "2026-03-16T09:00:00Z",
-    updated_at: "2026-04-14T10:00:00Z",
-  },
-  // --- Additional allocated pieces for Gantt demo ---
-  {
-    id: "p5e6f7a8-b9c0-1234-efab-345678901234",
-    project_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    reference: "VIG-02",
-    description: "Viga secundária HEB200",
-    material: "S355JR",
-    wps: "WPS-001",
-    quantity: 6,
-    weight_kg: 210,
-    estimated_hours: 6,
-    status: "allocated",
-    robot_id: 1,
-    scheduled_date: "2026-04-16",
-    scheduled_period: "PM",
-    urgent: false,
-    barcode: "VIG02-001",
-    program_id: null,
-    position: 3,
-    created_at: "2026-04-14T08:00:00Z",
-    updated_at: "2026-04-14T08:00:00Z",
-  },
-  {
-    id: "p6f7a8b9-c0d1-2345-fabc-456789012345",
-    project_id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-    reference: "BANC-02",
-    description: "Bancada 1.5m aço inox 304",
-    material: "AISI 304",
-    wps: "WPS-003",
-    quantity: 2,
-    weight_kg: 65,
-    estimated_hours: 4,
-    status: "allocated",
-    robot_id: 5,
-    scheduled_date: "2026-04-17",
-    scheduled_period: "AM",
-    urgent: false,
-    barcode: "BANC02-001",
-    program_id: null,
-    position: 1,
-    created_at: "2026-04-14T08:00:00Z",
-    updated_at: "2026-04-14T08:00:00Z",
-  },
-  {
-    id: "p7a8b9c0-d1e2-3456-abcd-567890123456",
-    project_id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
-    reference: "ESC-01",
-    description: "Viga escada lanço 1",
-    material: "S275JR",
-    wps: "WPS-002",
-    quantity: 2,
-    weight_kg: 150,
-    estimated_hours: 5,
-    status: "allocated",
-    robot_id: 2,
-    scheduled_date: "2026-04-17",
-    scheduled_period: "AM",
-    urgent: false,
-    barcode: "ESC01-001",
-    program_id: null,
-    position: 0,
-    created_at: "2026-04-14T08:00:00Z",
-    updated_at: "2026-04-14T08:00:00Z",
-  },
-  {
-    id: "p8b9c0d1-e2f3-4567-bcde-678901234567",
-    project_id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
-    reference: "ESC-02",
-    description: "Guarda-corpos escada",
-    material: "S275JR",
-    wps: "WPS-002",
-    quantity: 4,
-    weight_kg: 80,
-    estimated_hours: 3,
-    status: "allocated",
-    robot_id: 3,
-    scheduled_date: "2026-04-21",
-    scheduled_period: "AM",
-    urgent: false,
-    barcode: "ESC02-001",
-    program_id: null,
-    position: 1,
-    created_at: "2026-04-14T08:00:00Z",
-    updated_at: "2026-04-14T08:00:00Z",
-  },
-  {
-    id: "p9c0d1e2-f3a4-5678-cdef-789012345678",
-    project_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    reference: "PIR-02",
-    description: "Pilar HEB160",
-    material: "S355JR",
-    wps: "WPS-001",
-    quantity: 4,
-    weight_kg: 120,
-    estimated_hours: 3,
-    status: "allocated",
-    robot_id: 5,
-    scheduled_date: "2026-04-22",
-    scheduled_period: "PM",
-    urgent: false,
-    barcode: "PIR02-001",
-    program_id: null,
-    position: 4,
-    created_at: "2026-04-14T08:00:00Z",
-    updated_at: "2026-04-14T08:00:00Z",
-  },
-  // --- Backlog pieces (not on Gantt) ---
-  {
-    id: "p10d1e2f3-a4b5-6789-defa-890123456789",
-    project_id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
-    reference: "ESC-03",
-    description: "Patamar superior escada",
-    material: "S275JR",
-    wps: "WPS-002",
-    quantity: 1,
-    weight_kg: 200,
-    estimated_hours: 4,
-    status: "backlog",
-    robot_id: null,
-    scheduled_date: null,
-    scheduled_period: null,
-    urgent: false,
-    barcode: null,
-    program_id: null,
-    position: 2,
-    created_at: "2026-04-14T08:00:00Z",
-    updated_at: "2026-04-14T08:00:00Z",
-  },
-];
-
-// --- Mutable store (module-level singleton, resets on server restart) ---
-
-let projects: Project[] = [...seedProjects];
-let pieces: Piece[] = [...seedPieces];
-
-function generateId(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
+import type { Project, Piece, Robot } from "@/lib/types";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 // --- Project queries ---
 
-export function getProjects(includeArchived = false): Project[] {
-  if (includeArchived) return [...projects];
-  return projects.filter((p) => p.status !== "archived");
+export async function getProjects(includeArchived = false): Promise<Project[]> {
+  const supabase = await createServerSupabaseClient();
+  let query = supabase.from("project").select("*");
+  if (!includeArchived) {
+    query = query.neq("status", "archived");
+  }
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new Error(`getProjects: ${error.message}`);
+  return data ?? [];
 }
 
-export function getProjectById(id: string): Project | null {
-  return projects.find((p) => p.id === id) ?? null;
+export async function getProjectById(id: string): Promise<Project | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("project")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null; // not found
+    throw new Error(`getProjectById: ${error.message}`);
+  }
+  return data;
 }
 
-export function getProjectByClientRef(clientRef: string): Project | null {
-  return projects.find((p) => p.client_ref === clientRef) ?? null;
+export async function getProjectByClientRef(
+  clientRef: string
+): Promise<Project | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("project")
+    .select("*")
+    .eq("client_ref", clientRef)
+    .maybeSingle();
+  if (error) throw new Error(`getProjectByClientRef: ${error.message}`);
+  return data;
 }
 
-export function createProject(
+export async function createProject(
   data: Omit<Project, "id" | "created_at" | "updated_at">
-): Project {
-  const project: Project = {
-    ...data,
-    id: generateId(),
-    created_at: now(),
-    updated_at: now(),
-  };
-  projects.push(project);
+): Promise<Project> {
+  const supabase = await createServerSupabaseClient();
+  const { data: project, error } = await supabase
+    .from("project")
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw new Error(`createProject: ${error.message}`);
   return project;
 }
 
-export function updateProject(
+export async function updateProject(
   id: string,
   data: Partial<Omit<Project, "id" | "created_at" | "updated_at">>
-): Project | null {
-  const idx = projects.findIndex((p) => p.id === id);
-  if (idx === -1) return null;
-  projects[idx] = { ...projects[idx], ...data, updated_at: now() };
-  return projects[idx];
+): Promise<Project | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data: project, error } = await supabase
+    .from("project")
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`updateProject: ${error.message}`);
+  }
+  return project;
 }
 
-export function archiveProject(id: string): Project | null {
+export async function archiveProject(id: string): Promise<Project | null> {
   return updateProject(id, { status: "archived" });
 }
 
 // --- Piece queries ---
 
-export function getPiecesByProject(projectId: string): Piece[] {
-  return pieces
-    .filter((p) => p.project_id === projectId)
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+export async function getPiecesByProject(projectId: string): Promise<Piece[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("position", { ascending: true, nullsFirst: false });
+  if (error) throw new Error(`getPiecesByProject: ${error.message}`);
+  return data ?? [];
 }
 
-export function getPieceById(id: string): Piece | null {
-  return pieces.find((p) => p.id === id) ?? null;
+export async function getPieceById(id: string): Promise<Piece | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`getPieceById: ${error.message}`);
+  }
+  return data;
 }
 
-export function getPieceByReference(
+export async function getPieceByReference(
   projectId: string,
   reference: string
-): Piece | null {
-  return (
-    pieces.find(
-      (p) => p.project_id === projectId && p.reference === reference
-    ) ?? null
-  );
+): Promise<Piece | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("reference", reference)
+    .maybeSingle();
+  if (error) throw new Error(`getPieceByReference: ${error.message}`);
+  return data;
 }
 
-export function createPiece(
+export async function createPiece(
   data: Omit<Piece, "id" | "created_at" | "updated_at">
-): Piece {
-  const piece: Piece = {
-    ...data,
-    id: generateId(),
-    created_at: now(),
-    updated_at: now(),
-  };
-  pieces.push(piece);
+): Promise<Piece> {
+  const supabase = await createServerSupabaseClient();
+  const { data: piece, error } = await supabase
+    .from("piece")
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw new Error(`createPiece: ${error.message}`);
   return piece;
 }
 
-export function updatePiece(
+export async function updatePiece(
   id: string,
   data: Partial<Omit<Piece, "id" | "project_id" | "created_at" | "updated_at">>
-): Piece | null {
-  const idx = pieces.findIndex((p) => p.id === id);
-  if (idx === -1) return null;
-  pieces[idx] = { ...pieces[idx], ...data, updated_at: now() };
-  return pieces[idx];
+): Promise<Piece | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data: piece, error } = await supabase
+    .from("piece")
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`updatePiece: ${error.message}`);
+  }
+  return piece;
 }
 
-export function deletePiece(id: string): boolean {
-  const idx = pieces.findIndex((p) => p.id === id);
-  if (idx === -1) return false;
-  pieces.splice(idx, 1);
+export async function deletePiece(id: string): Promise<boolean> {
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase
+    .from("piece")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`deletePiece: ${error.message}`);
+  // If no error, consider it successful (count may be null without .select())
   return true;
 }
 
-export function getPieceCountByProject(projectId: string): number {
-  return pieces.filter((p) => p.project_id === projectId).length;
+export async function getPieceCountByProject(
+  projectId: string
+): Promise<number> {
+  const supabase = await createServerSupabaseClient();
+  const { count, error } = await supabase
+    .from("piece")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", projectId);
+  if (error) throw new Error(`getPieceCountByProject: ${error.message}`);
+  return count ?? 0;
 }
 
 /**
  * Returns a map of project_id -> piece count for all projects.
  */
-export function getAllPieceCounts(): Map<string, number> {
+export async function getAllPieceCounts(): Promise<Map<string, number>> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("project_id");
+  if (error) throw new Error(`getAllPieceCounts: ${error.message}`);
+
   const counts = new Map<string, number>();
-  for (const p of pieces) {
-    counts.set(p.project_id, (counts.get(p.project_id) ?? 0) + 1);
+  for (const row of data ?? []) {
+    counts.set(row.project_id, (counts.get(row.project_id) ?? 0) + 1);
   }
   return counts;
 }
@@ -393,21 +197,24 @@ export function getAllPieceCounts(): Map<string, number> {
 /**
  * Returns all pieces across all projects.
  */
-export function getAllPieces(): Piece[] {
-  return [...pieces];
+export async function getAllPieces(): Promise<Piece[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getAllPieces: ${error.message}`);
+  return data ?? [];
 }
 
 /**
  * Moves a piece to a new status. Returns the updated piece or null if not found.
  */
-export function movePiece(
+export async function movePiece(
   pieceId: string,
   newStatus: Piece["status"]
-): Piece | null {
-  const idx = pieces.findIndex((p) => p.id === pieceId);
-  if (idx === -1) return null;
-  pieces[idx] = { ...pieces[idx], status: newStatus, updated_at: now() };
-  return pieces[idx];
+): Promise<Piece | null> {
+  return updatePiece(pieceId, { status: newStatus });
 }
 
 // --- Allocation ---
@@ -416,12 +223,12 @@ export function movePiece(
  * Allocates a piece to a robot on a specific date and period.
  * Sets status to 'allocated'.
  */
-export function allocatePiece(
+export async function allocatePiece(
   pieceId: string,
   robotId: number,
   date: string,
   period: "AM" | "PM"
-): Piece | null {
+): Promise<Piece | null> {
   return updatePiece(pieceId, {
     status: "allocated",
     robot_id: robotId,
@@ -433,7 +240,7 @@ export function allocatePiece(
 /**
  * Removes allocation from a piece, returning it to backlog.
  */
-export function deallocatePiece(pieceId: string): Piece | null {
+export async function deallocatePiece(pieceId: string): Promise<Piece | null> {
   return updatePiece(pieceId, {
     status: "backlog",
     robot_id: null,
@@ -445,25 +252,56 @@ export function deallocatePiece(pieceId: string): Piece | null {
 /**
  * Returns the number of pieces allocated to a robot on a given date.
  */
-export function getRobotLoad(robotId: number, date: string): number {
-  return pieces.filter(
-    (p) => p.robot_id === robotId && p.scheduled_date === date
-  ).length;
+export async function getRobotLoad(
+  robotId: number,
+  date: string
+): Promise<number> {
+  const supabase = await createServerSupabaseClient();
+  const { count, error } = await supabase
+    .from("piece")
+    .select("*", { count: "exact", head: true })
+    .eq("robot_id", robotId)
+    .eq("scheduled_date", date);
+  if (error) throw new Error(`getRobotLoad: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Returns all robots.
+ */
+export async function getAllRobots(): Promise<Robot[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("robot")
+    .select("*")
+    .order("id", { ascending: true });
+  if (error) throw new Error(`getAllRobots: ${error.message}`);
+  return data ?? [];
 }
 
 /**
  * Returns all pieces allocated to a specific robot.
  */
-export function getPiecesByRobot(robotId: number): Piece[] {
-  return pieces.filter((p) => p.robot_id === robotId);
+export async function getPiecesByRobot(robotId: number): Promise<Piece[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("*")
+    .eq("robot_id", robotId)
+    .order("scheduled_date", { ascending: true });
+  if (error) throw new Error(`getPiecesByRobot: ${error.message}`);
+  return data ?? [];
 }
 
 // --- Program linking ---
 
-export function linkProgram(pieceId: string, programId: string): Piece | null {
+export async function linkProgram(
+  pieceId: string,
+  programId: string
+): Promise<Piece | null> {
   return updatePiece(pieceId, { program_id: programId });
 }
 
-export function unlinkProgram(pieceId: string): Piece | null {
+export async function unlinkProgram(pieceId: string): Promise<Piece | null> {
   return updatePiece(pieceId, { program_id: null });
 }

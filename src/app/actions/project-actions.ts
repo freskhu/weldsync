@@ -43,7 +43,7 @@ export async function createProjectAction(
   }
 
   // Check unique client_ref
-  const existing = getProjectByClientRef(result.data.client_ref);
+  const existing = await getProjectByClientRef(result.data.client_ref);
   if (existing) {
     return {
       success: false,
@@ -53,7 +53,7 @@ export async function createProjectAction(
     };
   }
 
-  dbCreateProject({
+  await dbCreateProject({
     client_ref: result.data.client_ref,
     name: result.data.name,
     client_name: result.data.client_name,
@@ -74,7 +74,7 @@ export async function updateProjectAction(
   const id = formData.get("id") as string;
   if (!id) return { success: false, error: "ID do projeto em falta." };
 
-  const project = getProjectById(id);
+  const project = await getProjectById(id);
   if (!project) return { success: false, error: "Projeto nao encontrado." };
 
   const raw = {
@@ -100,7 +100,7 @@ export async function updateProjectAction(
 
   // Check unique client_ref if changed
   if (result.data.client_ref && result.data.client_ref !== project.client_ref) {
-    const existing = getProjectByClientRef(result.data.client_ref);
+    const existing = await getProjectByClientRef(result.data.client_ref);
     if (existing) {
       return {
         success: false,
@@ -111,7 +111,7 @@ export async function updateProjectAction(
     }
   }
 
-  dbUpdateProject(id, {
+  await dbUpdateProject(id, {
     ...(result.data.client_ref && { client_ref: result.data.client_ref }),
     ...(result.data.name && { name: result.data.name }),
     ...(result.data.client_name && { client_name: result.data.client_name }),
@@ -131,7 +131,7 @@ export async function archiveProjectAction(
   const id = formData.get("id") as string;
   if (!id) return { success: false, error: "ID do projeto em falta." };
 
-  const result = dbArchiveProject(id);
+  const result = await dbArchiveProject(id);
   if (!result) return { success: false, error: "Projeto nao encontrado." };
 
   revalidatePath("/projects");

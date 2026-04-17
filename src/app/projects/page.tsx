@@ -1,9 +1,11 @@
 import { getProjects, getAllPieceCounts } from "@/lib/data/store";
 import { ProjectList } from "@/components/projects/project-list";
 
-export default function ProjectsPage() {
-  const projects = getProjects();
-  const pieceCountsMap = getAllPieceCounts();
+export default async function ProjectsPage() {
+  const [projects, pieceCountsMap] = await Promise.all([
+    getProjects(),
+    getAllPieceCounts(),
+  ]);
 
   // Convert Map to plain object for serialization to client component
   const pieceCounts: Record<string, number> = {};

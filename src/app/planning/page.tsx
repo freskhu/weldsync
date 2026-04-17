@@ -4,8 +4,8 @@ import { KanbanBoard } from "@/components/planning/kanban-board";
 
 export default async function PlanningPage() {
   const [pieces, projects, robots] = await Promise.all([
-    Promise.resolve(getAllPieces()),
-    Promise.resolve(getProjects()),
+    getAllPieces(),
+    getProjects(),
     getRobots(),
   ]);
 

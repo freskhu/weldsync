@@ -4,8 +4,8 @@ import { CalendarViews } from "@/components/calendar/calendar-views";
 
 export default async function CalendarPage() {
   const [pieces, projects, robots] = await Promise.all([
-    Promise.resolve(getAllPieces()),
-    Promise.resolve(getProjects()),
+    getAllPieces(),
+    getProjects(),
     getRobots(),
   ]);
 

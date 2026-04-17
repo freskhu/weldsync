@@ -1,184 +1,15 @@
 /**
  * Data access layer for Programs.
- *
- * Currently backed by in-memory mock data.
- * When Supabase is connected, swap implementations here — callers stay unchanged.
+ * Backed by Supabase queries + Storage for file uploads.
  */
 
 import type { Program, Robot } from "@/lib/types";
-import type { ProgramCreateInput, ProgramUpdateInput } from "@/lib/validations/program";
-
-// ---------------------------------------------------------------------------
-// Mock robots (matches seed data from 00004_seed_robots.sql)
-// ---------------------------------------------------------------------------
-
-const MOCK_ROBOTS: Robot[] = [
-  {
-    id: 1,
-    name: "Robot 1 — Posicionador 7t",
-    description: "Posicionador com capacidade de 7 toneladas",
-    capacity_kg: 7000,
-    setup_type: "posicionador",
-    capabilities: ["posicionador"],
-    created_at: "2025-01-01T00:00:00Z",
-    updated_at: "2025-01-01T00:00:00Z",
-  },
-  {
-    id: 2,
-    name: "Robot 2 — Coluna + Posicionador 15t",
-    description: "Coluna com posicionador, capacidade de 15 toneladas",
-    capacity_kg: 15000,
-    setup_type: "coluna_posicionador",
-    capabilities: ["coluna", "posicionador"],
-    created_at: "2025-01-01T00:00:00Z",
-    updated_at: "2025-01-01T00:00:00Z",
-  },
-  {
-    id: 3,
-    name: "Robot 3 — Coluna + Posicionador 15t",
-    description: "Coluna com posicionador, capacidade de 15 toneladas",
-    capacity_kg: 15000,
-    setup_type: "coluna_posicionador",
-    capabilities: ["coluna", "posicionador"],
-    created_at: "2025-01-01T00:00:00Z",
-    updated_at: "2025-01-01T00:00:00Z",
-  },
-  {
-    id: 4,
-    name: "Robot 4 — Monobloco 2 Áreas 1t",
-    description: "Monobloco com 2 áreas de trabalho, capacidade de 1 tonelada",
-    capacity_kg: 1000,
-    setup_type: "monobloco",
-    capabilities: ["monobloco", "2_areas"],
-    created_at: "2025-01-01T00:00:00Z",
-    updated_at: "2025-01-01T00:00:00Z",
-  },
-  {
-    id: 5,
-    name: "Robot 5 — Mesa Rotativa 10t",
-    description: "Mesa rotativa com capacidade de 10 toneladas",
-    capacity_kg: 10000,
-    setup_type: "mesa_rotativa",
-    capabilities: ["mesa_rotativa"],
-    created_at: "2025-01-01T00:00:00Z",
-    updated_at: "2025-01-01T00:00:00Z",
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Mock programs store (in-memory, resets on server restart)
-// ---------------------------------------------------------------------------
-
-let mockPrograms: Program[] = [
-  {
-    id: "p1-aaa-bbb-ccc",
-    piece_reference: "CURV-2025-001",
-    client_ref: "CLI-TEKEVER-001",
-    is_template: true,
-    template_id: null,
-    robot_id: 1,
-    file_type: "tp",
-    file_url: "/mock/CURV-2025-001.tp",
-    file_name: "CURV-2025-001.tp",
-    execution_time_min: 45,
-    wps: "WPS-135-MAG",
-    notes: "Template base para peças TEKEVER — perfil tubular",
-    created_at: "2025-03-10T08:00:00Z",
-  },
-  {
-    id: "p2-ddd-eee-fff",
-    piece_reference: "CURV-2025-002",
-    client_ref: "CLI-TEKEVER-002",
-    is_template: false,
-    template_id: "p1-aaa-bbb-ccc",
-    robot_id: 1,
-    file_type: "tp",
-    file_url: "/mock/CURV-2025-002.tp",
-    file_name: "CURV-2025-002.tp",
-    execution_time_min: 52,
-    wps: "WPS-135-MAG",
-    notes: "Variante da template para lote #2",
-    created_at: "2025-03-12T10:30:00Z",
-  },
-  {
-    id: "p3-ggg-hhh-iii",
-    piece_reference: "CURV-2025-010",
-    client_ref: "CLI-EFACEC-001",
-    is_template: false,
-    template_id: null,
-    robot_id: 2,
-    file_type: "ls",
-    file_url: "/mock/CURV-2025-010.ls",
-    file_name: "CURV-2025-010.ls",
-    execution_time_min: 120,
-    wps: "WPS-141-TIG",
-    notes: "Programa para chassis EFACEC — soldadura TIG",
-    created_at: "2025-03-15T14:00:00Z",
-  },
-  {
-    id: "p4-jjj-kkk-lll",
-    piece_reference: "CURV-2025-015",
-    client_ref: "CLI-MARTIFER-001",
-    is_template: true,
-    template_id: null,
-    robot_id: 3,
-    file_type: "tp",
-    file_url: "/mock/CURV-2025-015.tp",
-    file_name: "CURV-2025-015.tp",
-    execution_time_min: 90,
-    wps: "WPS-135-MAG",
-    notes: "Template para estruturas Martifer — vigas HEB",
-    created_at: "2025-04-01T09:00:00Z",
-  },
-  {
-    id: "p5-mmm-nnn-ooo",
-    piece_reference: "CURV-2025-020",
-    client_ref: null,
-    is_template: true,
-    template_id: null,
-    robot_id: 5,
-    file_type: "ls",
-    file_url: "/mock/CURV-2025-020.ls",
-    file_name: "CURV-2025-020.ls",
-    execution_time_min: 30,
-    wps: "WPS-135-MAG",
-    notes: "Template genérica — mesa rotativa, peças pequenas",
-    created_at: "2025-04-05T11:00:00Z",
-  },
-  {
-    id: "p6-ppp-qqq-rrr",
-    piece_reference: "CURV-2025-021",
-    client_ref: "CLI-EFACEC-002",
-    is_template: false,
-    template_id: null,
-    robot_id: 4,
-    file_type: "tp",
-    file_url: "/mock/CURV-2025-021.tp",
-    file_name: "CURV-2025-021.tp",
-    execution_time_min: 65,
-    wps: "WPS-141-TIG",
-    notes: null,
-    created_at: "2025-04-10T16:30:00Z",
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function matchesSearch(program: Program, query: string): boolean {
-  const q = query.toLowerCase();
-  return (
-    program.piece_reference.toLowerCase().includes(q) ||
-    (program.client_ref?.toLowerCase().includes(q) ?? false) ||
-    (program.notes?.toLowerCase().includes(q) ?? false) ||
-    program.file_name.toLowerCase().includes(q)
-  );
-}
+import type {
+  ProgramCreateInput,
+  ProgramUpdateInput,
+} from "@/lib/validations/program";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getAllRobots } from "@/lib/data/store";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -191,109 +22,172 @@ export interface ProgramFilters {
   is_template?: boolean;
 }
 
-export async function getPrograms(filters?: ProgramFilters): Promise<Program[]> {
-  let results = [...mockPrograms];
+export async function getPrograms(
+  filters?: ProgramFilters
+): Promise<Program[]> {
+  const supabase = await createServerSupabaseClient();
+  let query = supabase.from("program").select("*");
 
   if (filters?.search) {
-    results = results.filter((p) => matchesSearch(p, filters.search!));
+    // Use ilike for flexible search across multiple columns
+    const term = `%${filters.search}%`;
+    query = query.or(
+      `piece_reference.ilike.${term},client_ref.ilike.${term},notes.ilike.${term},file_name.ilike.${term}`
+    );
   }
   if (filters?.client_ref) {
-    results = results.filter((p) => p.client_ref === filters.client_ref);
+    query = query.eq("client_ref", filters.client_ref);
   }
   if (filters?.robot_id !== undefined && filters.robot_id !== null) {
-    results = results.filter((p) => p.robot_id === filters.robot_id);
+    query = query.eq("robot_id", filters.robot_id);
   }
   if (filters?.is_template !== undefined) {
-    results = results.filter((p) => p.is_template === filters.is_template);
+    query = query.eq("is_template", filters.is_template);
   }
 
-  // Most recent first
-  results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  return results;
+  const { data, error } = await query.order("created_at", {
+    ascending: false,
+  });
+  if (error) throw new Error(`getPrograms: ${error.message}`);
+  return data ?? [];
 }
 
 export async function getProgramById(id: string): Promise<Program | null> {
-  return mockPrograms.find((p) => p.id === id) ?? null;
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("program")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`getProgramById: ${error.message}`);
+  }
+  return data;
 }
 
 export async function getTemplatePrograms(): Promise<Program[]> {
-  return mockPrograms.filter((p) => p.is_template);
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("program")
+    .select("*")
+    .eq("is_template", true)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`getTemplatePrograms: ${error.message}`);
+  return data ?? [];
 }
 
 export async function createProgram(
   input: ProgramCreateInput,
   fileUrl: string
 ): Promise<Program> {
-  const program: Program = {
-    id: generateId(),
-    piece_reference: input.piece_reference,
-    client_ref: input.client_ref ?? null,
-    is_template: input.is_template,
-    template_id: input.template_id ?? null,
-    robot_id: input.robot_id ?? null,
-    file_type: input.file_type,
-    file_url: fileUrl,
-    file_name: input.file_name,
-    execution_time_min: input.execution_time_min ?? null,
-    wps: input.wps ?? null,
-    notes: input.notes ?? null,
-    created_at: new Date().toISOString(),
-  };
-
-  mockPrograms.unshift(program);
-  return program;
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("program")
+    .insert({
+      piece_reference: input.piece_reference,
+      client_ref: input.client_ref ?? null,
+      is_template: input.is_template,
+      template_id: input.template_id ?? null,
+      robot_id: input.robot_id ?? null,
+      file_type: input.file_type,
+      file_url: fileUrl,
+      file_name: input.file_name,
+      execution_time_min: input.execution_time_min ?? null,
+      wps: input.wps ?? null,
+      notes: input.notes ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(`createProgram: ${error.message}`);
+  return data;
 }
 
 export async function updateProgram(
   id: string,
   input: ProgramUpdateInput
 ): Promise<Program | null> {
-  const index = mockPrograms.findIndex((p) => p.id === id);
-  if (index === -1) return null;
+  const supabase = await createServerSupabaseClient();
 
-  const existing = mockPrograms[index];
-  const updated: Program = {
-    ...existing,
-    piece_reference: input.piece_reference ?? existing.piece_reference,
-    client_ref: input.client_ref !== undefined ? (input.client_ref ?? null) : existing.client_ref,
-    is_template: input.is_template ?? existing.is_template,
-    template_id:
-      input.template_id !== undefined ? (input.template_id ?? null) : existing.template_id,
-    robot_id: input.robot_id !== undefined ? (input.robot_id ?? null) : existing.robot_id,
-    execution_time_min:
-      input.execution_time_min !== undefined
-        ? (input.execution_time_min ?? null)
-        : existing.execution_time_min,
-    wps: input.wps !== undefined ? (input.wps ?? null) : existing.wps,
-    notes: input.notes !== undefined ? (input.notes ?? null) : existing.notes,
-  };
+  // Build the update payload, only including fields that were provided
+  const updateData: Record<string, unknown> = {};
+  if (input.piece_reference !== undefined)
+    updateData.piece_reference = input.piece_reference;
+  if (input.client_ref !== undefined)
+    updateData.client_ref = input.client_ref ?? null;
+  if (input.is_template !== undefined)
+    updateData.is_template = input.is_template;
+  if (input.template_id !== undefined)
+    updateData.template_id = input.template_id ?? null;
+  if (input.robot_id !== undefined)
+    updateData.robot_id = input.robot_id ?? null;
+  if (input.execution_time_min !== undefined)
+    updateData.execution_time_min = input.execution_time_min ?? null;
+  if (input.wps !== undefined) updateData.wps = input.wps ?? null;
+  if (input.notes !== undefined) updateData.notes = input.notes ?? null;
 
-  mockPrograms[index] = updated;
-  return updated;
+  const { data, error } = await supabase
+    .from("program")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`updateProgram: ${error.message}`);
+  }
+  return data;
 }
 
 export async function deleteProgram(id: string): Promise<boolean> {
-  const before = mockPrograms.length;
-  mockPrograms = mockPrograms.filter((p) => p.id !== id);
+  const supabase = await createServerSupabaseClient();
 
-  // Unlink any programs that referenced this as template
-  mockPrograms = mockPrograms.map((p) =>
-    p.template_id === id ? { ...p, template_id: null } : p
-  );
+  // Get the program first to find the file path for storage cleanup
+  const { data: program } = await supabase
+    .from("program")
+    .select("file_url")
+    .eq("id", id)
+    .single();
 
-  return mockPrograms.length < before;
+  // Clean up storage file if it exists and is a Supabase storage URL
+  if (program?.file_url) {
+    // Extract path from the public URL if it's a Supabase storage URL
+    const storagePrefix = "/storage/v1/object/public/programs/";
+    const idx = program.file_url.indexOf(storagePrefix);
+    if (idx !== -1) {
+      const filePath = program.file_url.substring(idx + storagePrefix.length);
+      await supabase.storage.from("programs").remove([filePath]);
+    }
+  }
+
+  // Clear template_id references in other programs
+  await supabase
+    .from("program")
+    .update({ template_id: null })
+    .eq("template_id", id);
+
+  // Delete the program record
+  const { error } = await supabase.from("program").delete().eq("id", id);
+  if (error) throw new Error(`deleteProgram: ${error.message}`);
+  return true;
 }
 
 export async function getRobots(): Promise<Robot[]> {
-  return MOCK_ROBOTS;
+  return getAllRobots();
 }
 
 /** Get unique client refs from existing programs */
 export async function getUniqueClientRefs(): Promise<string[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("program")
+    .select("client_ref")
+    .not("client_ref", "is", null);
+  if (error) throw new Error(`getUniqueClientRefs: ${error.message}`);
+
   const refs = new Set<string>();
-  for (const p of mockPrograms) {
-    if (p.client_ref) refs.add(p.client_ref);
+  for (const row of data ?? []) {
+    if (row.client_ref) refs.add(row.client_ref);
   }
   return Array.from(refs).sort();
 }
@@ -319,10 +213,18 @@ export async function suggestPrograms(
 ): Promise<SuggestedProgram[]> {
   if (!pieceReference || pieceReference.trim().length === 0) return [];
 
+  const supabase = await createServerSupabaseClient();
   const query = pieceReference.toLowerCase().trim();
+
+  // Fetch all programs for scoring (program table is small enough for this)
+  const { data: allPrograms, error } = await supabase
+    .from("program")
+    .select("*");
+  if (error) throw new Error(`suggestPrograms: ${error.message}`);
+
   const scored: SuggestedProgram[] = [];
 
-  for (const program of mockPrograms) {
+  for (const program of allPrograms ?? []) {
     const progRef = program.piece_reference.toLowerCase();
     let relevance = 0;
     let match_reason = "";
@@ -341,8 +243,8 @@ export async function suggestPrograms(
     else {
       const queryParts = query.split(/[-_\s]+/).filter(Boolean);
       const progParts = progRef.split(/[-_\s]+/).filter(Boolean);
-      const overlap = queryParts.filter((qp) =>
-        progParts.some((pp) => pp.includes(qp) || qp.includes(pp))
+      const overlap = queryParts.filter((qp: string) =>
+        progParts.some((pp: string) => pp.includes(qp) || qp.includes(pp))
       );
       if (overlap.length > 0) {
         relevance = 20 + (overlap.length / queryParts.length) * 20;
@@ -376,7 +278,9 @@ export async function suggestPrograms(
   scored.sort((a, b) => {
     if (b.relevance !== a.relevance) return b.relevance - a.relevance;
     if (a.is_template !== b.is_template) return a.is_template ? -1 : 1;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return (
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   });
 
   return scored.slice(0, 10);

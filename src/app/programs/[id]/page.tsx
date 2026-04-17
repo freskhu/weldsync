@@ -112,7 +112,7 @@ export default async function ProgramDetailPage({ params }: ProgramDetailPagePro
           </a>
         </div>
         <p className="text-xs text-zinc-400 mt-1">
-          Armazenamento local (mock). Em produção, usa Supabase Storage.
+          Armazenado no Supabase Storage.
         </p>
       </div>
 

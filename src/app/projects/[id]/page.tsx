@@ -8,13 +8,13 @@ interface ProjectPageProps {
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const { id } = await params;
-  const project = getProjectById(id);
+  const project = await getProjectById(id);
 
   if (!project) {
     notFound();
   }
 
-  const pieces = getPiecesByProject(project.id);
+  const pieces = await getPiecesByProject(project.id);
 
   return (
     <div className="p-6 md:p-8 max-w-6xl">

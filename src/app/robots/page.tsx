@@ -11,7 +11,7 @@ export default async function RobotsPage() {
     { reference: string; description: string | null; scheduled_date: string | null; weight_kg: number | null }[]
   > = {};
   for (const robot of robots) {
-    const pieces = getPiecesByRobot(robot.id);
+    const pieces = await getPiecesByRobot(robot.id);
     robotAllocations[robot.id] = pieces.map((p) => ({
       reference: p.reference,
       description: p.description,

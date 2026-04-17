@@ -10,14 +10,14 @@ import { DeadlineAlerts } from "@/components/dashboard/deadline-alerts";
 import { ThroughputChart } from "@/components/dashboard/throughput-chart";
 
 export default async function DashboardPage() {
-  const [weekOccupancy, monthOccupancy] = await Promise.all([
-    getRobotOccupancyAsync("week"),
-    getRobotOccupancyAsync("month"),
-  ]);
-
-  const pipeline = getPipelineCounts();
-  const alerts = getDeadlineAlerts(7);
-  const throughput = getThroughput(8);
+  const [weekOccupancy, monthOccupancy, pipeline, alerts, throughput] =
+    await Promise.all([
+      getRobotOccupancyAsync("week"),
+      getRobotOccupancyAsync("month"),
+      getPipelineCounts(),
+      getDeadlineAlerts(7),
+      getThroughput(8),
+    ]);
 
   return (
     <div className="p-4 md:p-6">
