@@ -96,7 +96,7 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
       )}
 
       {/* Pieces */}
-      <PieceTable pieces={pieces} projectId={project.id} />
+      <PieceTable pieces={pieces} projectId={project.id} clientRef={project.client_ref} />
 
       {/* Edit Project Modal */}
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Editar Projeto">

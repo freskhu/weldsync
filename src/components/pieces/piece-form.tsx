@@ -1,18 +1,21 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import type { Piece } from "@/lib/types";
 import type { ActionResult } from "@/app/actions/piece-actions";
+import { linkProgramToPiece, unlinkProgramFromPiece } from "@/app/actions/piece-actions";
+import { ProgramSuggestions } from "./program-suggestions";
 
 interface PieceFormProps {
   action: (state: ActionResult | null, formData: FormData) => Promise<ActionResult>;
   projectId: string;
   piece?: Piece;
+  clientRef?: string;
   onCancel: () => void;
   onSuccess?: () => void;
 }
 
-export function PieceForm({ action, projectId, piece, onCancel, onSuccess }: PieceFormProps) {
+export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuccess }: PieceFormProps) {
   const [state, formAction, isPending] = useActionState(async (prev: ActionResult | null, formData: FormData) => {
     const result = await action(prev, formData);
     if (result.success && onSuccess) {
@@ -22,6 +25,36 @@ export function PieceForm({ action, projectId, piece, onCancel, onSuccess }: Pie
   }, null);
 
   const [urgent, setUrgent] = useState(piece?.urgent ?? false);
+  const [reference, setReference] = useState(piece?.reference ?? "");
+  const [linkedProgramId, setLinkedProgramId] = useState<string | null>(piece?.program_id ?? null);
+  const [, startTransition] = useTransition();
+
+  const handleLinkProgram = (programId: string) => {
+    if (!piece) {
+      // For new pieces, just set the local state — will be saved with the form
+      setLinkedProgramId(programId);
+      return;
+    }
+    startTransition(async () => {
+      const result = await linkProgramToPiece(piece.id, programId);
+      if (result.success) {
+        setLinkedProgramId(programId);
+      }
+    });
+  };
+
+  const handleUnlinkProgram = () => {
+    if (!piece) {
+      setLinkedProgramId(null);
+      return;
+    }
+    startTransition(async () => {
+      const result = await unlinkProgramFromPiece(piece.id);
+      if (result.success) {
+        setLinkedProgramId(null);
+      }
+    });
+  };
 
   return (
     <form action={formAction} className="space-y-4">
@@ -44,7 +77,8 @@ export function PieceForm({ action, projectId, piece, onCancel, onSuccess }: Pie
             id="reference"
             name="reference"
             type="text"
-            defaultValue={piece?.reference ?? ""}
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
             placeholder="VIG-01"
             required
             className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
@@ -180,6 +214,15 @@ export function PieceForm({ action, projectId, piece, onCancel, onSuccess }: Pie
           </label>
         </div>
       </div>
+
+      {/* Program Suggestions */}
+      <ProgramSuggestions
+        pieceReference={reference}
+        clientRef={clientRef}
+        linkedProgramId={linkedProgramId}
+        onSelect={handleLinkProgram}
+        onUnlink={handleUnlinkProgram}
+      />
 
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-2">

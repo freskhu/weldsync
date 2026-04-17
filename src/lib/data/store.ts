@@ -260,3 +260,33 @@ export function getAllPieceCounts(): Map<string, number> {
   }
   return counts;
 }
+
+/**
+ * Returns all pieces across all projects.
+ */
+export function getAllPieces(): Piece[] {
+  return [...pieces];
+}
+
+/**
+ * Moves a piece to a new status. Returns the updated piece or null if not found.
+ */
+export function movePiece(
+  pieceId: string,
+  newStatus: Piece["status"]
+): Piece | null {
+  const idx = pieces.findIndex((p) => p.id === pieceId);
+  if (idx === -1) return null;
+  pieces[idx] = { ...pieces[idx], status: newStatus, updated_at: now() };
+  return pieces[idx];
+}
+
+// --- Program linking ---
+
+export function linkProgram(pieceId: string, programId: string): Piece | null {
+  return updatePiece(pieceId, { program_id: programId });
+}
+
+export function unlinkProgram(pieceId: string): Piece | null {
+  return updatePiece(pieceId, { program_id: null });
+}

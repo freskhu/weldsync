@@ -297,3 +297,87 @@ export async function getUniqueClientRefs(): Promise<string[]> {
   }
   return Array.from(refs).sort();
 }
+
+// ---------------------------------------------------------------------------
+// Program suggestion engine
+// ---------------------------------------------------------------------------
+
+export interface SuggestedProgram extends Program {
+  /** Relevance score (higher = better match). Used for sorting. */
+  relevance: number;
+  /** Human-readable match reason */
+  match_reason: string;
+}
+
+/**
+ * Suggest programs that match a piece reference and optional client ref.
+ * Algorithm: exact > partial > fuzzy. Templates ranked above specifics.
+ */
+export async function suggestPrograms(
+  pieceReference: string,
+  clientRef?: string
+): Promise<SuggestedProgram[]> {
+  if (!pieceReference || pieceReference.trim().length === 0) return [];
+
+  const query = pieceReference.toLowerCase().trim();
+  const scored: SuggestedProgram[] = [];
+
+  for (const program of mockPrograms) {
+    const progRef = program.piece_reference.toLowerCase();
+    let relevance = 0;
+    let match_reason = "";
+
+    // Exact match on piece_reference
+    if (progRef === query) {
+      relevance = 100;
+      match_reason = "Referencia exacta";
+    }
+    // Partial match (contains)
+    else if (progRef.includes(query) || query.includes(progRef)) {
+      relevance = 60;
+      match_reason = "Referencia parcial";
+    }
+    // Fuzzy: check if words overlap
+    else {
+      const queryParts = query.split(/[-_\s]+/).filter(Boolean);
+      const progParts = progRef.split(/[-_\s]+/).filter(Boolean);
+      const overlap = queryParts.filter((qp) =>
+        progParts.some((pp) => pp.includes(qp) || qp.includes(pp))
+      );
+      if (overlap.length > 0) {
+        relevance = 20 + (overlap.length / queryParts.length) * 20;
+        match_reason = "Correspondencia parcial";
+      }
+    }
+
+    // Client ref boost
+    if (clientRef && program.client_ref) {
+      if (program.client_ref.toLowerCase() === clientRef.toLowerCase()) {
+        relevance += 15;
+        if (match_reason) match_reason += " + cliente";
+        else {
+          relevance = Math.max(relevance, 30);
+          match_reason = "Mesmo cliente";
+        }
+      }
+    }
+
+    // Template bonus (templates rank above specifics at same relevance)
+    if (program.is_template && relevance > 0) {
+      relevance += 5;
+    }
+
+    if (relevance > 0) {
+      scored.push({ ...program, relevance, match_reason });
+    }
+  }
+
+  // Sort by relevance descending, then templates first, then newest first
+  scored.sort((a, b) => {
+    if (b.relevance !== a.relevance) return b.relevance - a.relevance;
+    if (a.is_template !== b.is_template) return a.is_template ? -1 : 1;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  return scored.slice(0, 10);
+}

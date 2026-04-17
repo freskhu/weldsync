@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import type { Piece } from "@/lib/types";
 import { Modal } from "@/components/projects/project-modal";
 import { PieceForm } from "./piece-form";
@@ -10,14 +10,67 @@ import { useRouter } from "next/navigation";
 interface PieceTableProps {
   pieces: Piece[];
   projectId: string;
+  clientRef?: string;
 }
 
-export function PieceTable({ pieces, projectId }: PieceTableProps) {
+/** Minimal program info for display on piece rows */
+interface ProgramInfo {
+  id: string;
+  file_name: string;
+}
+
+export function PieceTable({ pieces, projectId, clientRef }: PieceTableProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingPiece, setEditingPiece] = useState<Piece | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [programMap, setProgramMap] = useState<Record<string, ProgramInfo>>({});
+  const [suggestionsAvailable, setSuggestionsAvailable] = useState<Record<string, boolean>>({});
   const router = useRouter();
+
+  // Fetch program info for linked pieces + check suggestions for unlinked
+  const fetchProgramData = useCallback(async () => {
+    const linked = pieces.filter((p) => p.program_id);
+    const unlinked = pieces.filter((p) => !p.program_id && p.reference);
+
+    // For linked pieces, we need program file_name. Fetch from programs data.
+    // Since we don't have a batch endpoint, we'll use the suggest endpoint as a proxy
+    // to get program data for display.
+    for (const piece of linked) {
+      if (piece.program_id && !programMap[piece.program_id]) {
+        try {
+          const res = await fetch(`/api/programs/suggest?piece_reference=${encodeURIComponent(piece.reference)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const found = data.find((p: ProgramInfo & { id: string }) => p.id === piece.program_id);
+            if (found) {
+              setProgramMap((prev) => ({ ...prev, [found.id]: { id: found.id, file_name: found.file_name } }));
+            }
+          }
+        } catch {
+          // Non-critical
+        }
+      }
+    }
+
+    // For unlinked pieces, check if suggestions exist
+    for (const piece of unlinked) {
+      try {
+        const res = await fetch(`/api/programs/suggest?piece_reference=${encodeURIComponent(piece.reference)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestionsAvailable((prev) => ({ ...prev, [piece.id]: data.length > 0 }));
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+  }, [pieces, programMap]);
+
+  useEffect(() => {
+    fetchProgramData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pieces]);
 
   const handleDelete = (pieceId: string) => {
     const formData = new FormData();
@@ -29,6 +82,30 @@ export function PieceTable({ pieces, projectId }: PieceTableProps) {
       setDeletingId(null);
       router.refresh();
     });
+  };
+
+  const renderProgramStatus = (piece: Piece) => {
+    if (piece.program_id) {
+      const prog = programMap[piece.program_id];
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-green-700">
+          <svg className="w-3.5 h-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="truncate max-w-[100px]">{prog?.file_name ?? "Associado"}</span>
+        </span>
+      );
+    }
+    if (suggestionsAvailable[piece.id]) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+          Sugerido
+        </span>
+      );
+    }
+    return (
+      <span className="text-zinc-300">&mdash;</span>
+    );
   };
 
   return (
@@ -68,6 +145,7 @@ export function PieceTable({ pieces, projectId }: PieceTableProps) {
                 <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Qtd</th>
                 <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Peso</th>
                 <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Horas</th>
+                <th className="text-center text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Programa</th>
                 <th className="text-center text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Estado</th>
                 <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3 w-28"></th>
               </tr>
@@ -108,6 +186,9 @@ export function PieceTable({ pieces, projectId }: PieceTableProps) {
                     <span className="text-sm text-zinc-600 tabular-nums">
                       {piece.estimated_hours ? `${piece.estimated_hours}h` : "--"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {renderProgramStatus(piece)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -184,6 +265,7 @@ export function PieceTable({ pieces, projectId }: PieceTableProps) {
         <PieceForm
           action={createPieceAction}
           projectId={projectId}
+          clientRef={clientRef}
           onCancel={() => setShowCreate(false)}
           onSuccess={() => {
             setShowCreate(false);
@@ -202,6 +284,7 @@ export function PieceTable({ pieces, projectId }: PieceTableProps) {
           <PieceForm
             action={updatePieceAction}
             projectId={projectId}
+            clientRef={clientRef}
             piece={editingPiece}
             onCancel={() => setEditingPiece(null)}
             onSuccess={() => {

@@ -8,7 +8,11 @@ import {
   deletePiece as dbDeletePiece,
   getPieceByReference,
   getPieceById,
+  movePiece as dbMovePiece,
+  linkProgram as dbLinkProgram,
+  unlinkProgram as dbUnlinkProgram,
 } from "@/lib/data/store";
+import type { PieceStatus } from "@/lib/types";
 
 export type ActionResult = {
   success: boolean;
@@ -156,6 +160,30 @@ export async function updatePieceAction(
   return { success: true };
 }
 
+const VALID_STATUSES: PieceStatus[] = [
+  "backlog",
+  "programmed",
+  "allocated",
+  "in_production",
+  "completed",
+];
+
+export async function movePieceAction(
+  pieceId: string,
+  newStatus: PieceStatus
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peça em falta." };
+  if (!VALID_STATUSES.includes(newStatus)) {
+    return { success: false, error: "Estado inválido." };
+  }
+
+  const piece = dbMovePiece(pieceId, newStatus);
+  if (!piece) return { success: false, error: "Peça não encontrada." };
+
+  revalidatePath("/planning");
+  return { success: true };
+}
+
 export async function deletePieceAction(
   formData: FormData
 ): Promise<ActionResult> {
@@ -168,5 +196,31 @@ export async function deletePieceAction(
   if (!result) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath(`/projects/${projectId}`);
+  return { success: true };
+}
+
+export async function linkProgramToPiece(
+  pieceId: string,
+  programId: string
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+  if (!programId) return { success: false, error: "ID do programa em falta." };
+
+  const piece = dbLinkProgram(pieceId, programId);
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  revalidatePath(`/projects/${piece.project_id}`);
+  return { success: true };
+}
+
+export async function unlinkProgramFromPiece(
+  pieceId: string
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+
+  const piece = dbUnlinkProgram(pieceId);
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  revalidatePath(`/projects/${piece.project_id}`);
   return { success: true };
 }
