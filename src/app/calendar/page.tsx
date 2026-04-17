@@ -1,6 +1,6 @@
 import { getAllPieces, getProjects } from "@/lib/data/store";
 import { getRobots } from "@/lib/data/programs";
-import { GanttChart } from "@/components/gantt/gantt-chart";
+import { CalendarViews } from "@/components/calendar/calendar-views";
 
 export default async function CalendarPage() {
   const [pieces, projects, robots] = await Promise.all([
@@ -18,7 +18,7 @@ export default async function CalendarPage() {
   return (
     <div className="p-6 h-screen flex flex-col">
       <h1 className="text-2xl font-bold text-zinc-900 mb-4">Calendário</h1>
-      <GanttChart pieces={pieces} robots={robots} projectMap={projectMap} />
+      <CalendarViews pieces={pieces} robots={robots} projectMap={projectMap} />
     </div>
   );
 }

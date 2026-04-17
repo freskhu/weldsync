@@ -268,6 +268,41 @@ export async function allocatePieceAction(
   return { success: true };
 }
 
+/**
+ * Direct allocation action — accepts plain arguments instead of FormData.
+ * Used by drag-and-drop in the Gantt/calendar views.
+ */
+export async function allocatePieceDirectAction(
+  pieceId: string,
+  robotId: number,
+  date: string,
+  period: "AM" | "PM"
+): Promise<ActionResult> {
+  const result = allocateSchema.safeParse({ pieceId, robotId, date, period });
+  if (!result.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of result.error.issues) {
+      const key = issue.path[0]?.toString() ?? "_root";
+      if (!fieldErrors[key]) fieldErrors[key] = [];
+      fieldErrors[key].push(issue.message);
+    }
+    return { success: false, fieldErrors };
+  }
+
+  const piece = dbAllocatePiece(
+    result.data.pieceId,
+    result.data.robotId,
+    result.data.date,
+    result.data.period
+  );
+  if (!piece) return { success: false, error: "Peça não encontrada." };
+
+  revalidatePath("/calendar");
+  revalidatePath("/planning");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
 export async function deallocatePieceAction(
   formData: FormData
 ): Promise<ActionResult> {
