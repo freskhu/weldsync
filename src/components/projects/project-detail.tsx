@@ -32,7 +32,7 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
           <span className="text-sm text-zinc-600">{project.client_ref}</span>
         </div>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
               className="w-4 h-4 rounded-full flex-shrink-0"

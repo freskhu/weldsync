@@ -23,7 +23,7 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-[280px] w-[280px] bg-zinc-100 rounded-xl transition-colors ${
+      className={`flex flex-col min-w-[240px] w-[240px] md:min-w-[280px] md:w-[280px] bg-zinc-100 rounded-xl transition-colors flex-shrink-0 ${
         isOver ? "bg-blue-50 ring-2 ring-blue-300" : ""
       }`}
     >

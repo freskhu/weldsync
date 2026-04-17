@@ -70,7 +70,7 @@ export function PieceCard({
         style={{ backgroundColor: projectColor }}
       />
 
-      <div className="pl-4 pr-3 py-2.5">
+      <div className="pl-4 pr-3 py-3">
         {/* Row 1: Reference + urgency */}
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-bold text-zinc-900 truncate">

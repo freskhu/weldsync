@@ -85,9 +85,9 @@ function buildDays(startMonday: Date, weeks: number): DayColumn[] {
 // ---------------------------------------------------------------------------
 
 const WEEKS_VISIBLE = 3;
-const LANE_HEADER_WIDTH = 220; // px
-const DAY_COL_WIDTH = 80; // px
-const LANE_HEIGHT = 80; // px — split into AM (top 40) + PM (bottom 40)
+const LANE_HEADER_WIDTH = 160; // px — narrower for iPad
+const DAY_COL_WIDTH = 72; // px — slightly narrower for iPad
+const LANE_HEIGHT = 96; // px — split into AM (top 48) + PM (bottom 48), meets 44px touch target
 const HALF_HEIGHT = LANE_HEIGHT / 2;
 const WEEK_HEADER_HEIGHT = 24;
 const DAY_HEADER_HEIGHT = 32;
@@ -181,7 +181,7 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
         <button
           onClick={() => shiftWeeks(-1)}
           className="px-3 py-1.5 text-sm font-medium bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors min-h-[44px] min-w-[44px]"
@@ -225,10 +225,10 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
               className="border-b border-zinc-100 px-3 flex flex-col justify-center"
               style={{ height: LANE_HEIGHT }}
             >
-              <span className="text-sm font-medium text-zinc-900 truncate">
+              <span className="text-xs font-medium text-zinc-900 truncate block">
                 {robot.name.split("—")[0].trim()}
               </span>
-              <span className="text-xs text-zinc-500 truncate">
+              <span className="text-[10px] text-zinc-500 truncate block">
                 {robot.name.split("—")[1]?.trim() ?? ""}
               </span>
               <span className="text-[10px] text-zinc-400 mt-0.5">

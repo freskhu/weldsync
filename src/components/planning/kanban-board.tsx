@@ -295,7 +295,7 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 flex gap-4 overflow-x-auto pb-4 min-h-0">
+        <div className="flex-1 flex gap-4 overflow-x-auto pb-4 min-h-0 scroll-smooth">
           {COLUMNS.map((col) => (
             <KanbanColumn
               key={col.id}

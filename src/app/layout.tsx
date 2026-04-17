@@ -29,7 +29,13 @@ export default function RootLayout({
       lang="pt"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex">
+      <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1"
+        />
+      </head>
+      <body className="min-h-full flex flex-col lg:flex-row">
         <Sidebar />
         <main className="flex-1 bg-zinc-50 min-h-screen">{children}</main>
       </body>

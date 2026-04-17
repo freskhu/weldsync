@@ -128,9 +128,9 @@ export default async function ProgramDetailPage({ params }: ProgramDetailPagePro
 
 function MetadataRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5">
-      <span className="text-sm text-zinc-500">{label}</span>
-      <span className="text-sm font-medium text-zinc-900 text-right">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 sm:px-5 py-3">
+      <span className="text-sm text-zinc-500 mb-0.5 sm:mb-0">{label}</span>
+      <span className="text-sm font-medium text-zinc-900 sm:text-right truncate">
         {value}
       </span>
     </div>

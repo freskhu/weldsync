@@ -77,7 +77,7 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-h-[120px] p-2 rounded-lg border transition-colors ${
+      className={`flex-1 min-h-[120px] p-2 rounded-lg border transition-colors touch-manipulation ${
         isOver
           ? "bg-blue-50 border-blue-300 ring-1 ring-blue-300"
           : "bg-white border-zinc-200"
@@ -386,7 +386,7 @@ export function DayView({
     >
       <div className="flex flex-col h-full">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
           <button
             onClick={prevDay}
             className="px-3 py-1.5 text-sm font-medium bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors min-h-[44px] min-w-[44px]"
@@ -416,7 +416,7 @@ export function DayView({
 
         {/* Grid: 5 columns (robots) x 2 rows (AM/PM) */}
         <div className="flex-1 min-h-0 overflow-auto">
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${robots.length}, minmax(180px, 1fr))` }}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${robots.length}, minmax(160px, 1fr))` }}>
             {/* Robot headers */}
             {robots.map((robot) => (
               <div

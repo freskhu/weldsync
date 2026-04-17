@@ -44,7 +44,7 @@ export function UploadProgramForm({ robots, templates, onClose }: UploadProgramF
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-zinc-200">
           <h2 className="text-lg font-semibold text-zinc-900">Novo Programa</h2>
           <button

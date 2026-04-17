@@ -78,7 +78,7 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[60px] p-1 border-b border-zinc-100 transition-colors ${
+      className={`min-h-[60px] p-1 border-b border-zinc-100 transition-colors touch-manipulation ${
         isOver ? "bg-blue-50 ring-1 ring-blue-300" : ""
       } ${isToday && !isOver ? "bg-blue-50/30" : ""}`}
     >
@@ -379,7 +379,7 @@ export function WeekView({
     >
       <div className="flex flex-col h-full">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
           <button
             onClick={prevWeek}
             className="px-3 py-1.5 text-sm font-medium bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors min-h-[44px] min-w-[44px]"
@@ -410,7 +410,7 @@ export function WeekView({
             <thead className="sticky top-0 z-10 bg-zinc-50">
               {/* Day header */}
               <tr>
-                <th className="w-[140px] min-w-[140px] border-b border-r border-zinc-200 px-2 py-2 text-xs font-semibold text-zinc-500 uppercase text-left">
+                <th className="w-[100px] min-w-[100px] md:w-[140px] md:min-w-[140px] border-b border-r border-zinc-200 px-2 py-2 text-xs font-semibold text-zinc-500 uppercase text-left">
                   Robot
                 </th>
                 {weekDays.map((day) => (

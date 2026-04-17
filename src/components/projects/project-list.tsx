@@ -39,8 +39,8 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
           <p className="text-sm mt-1">Cria o primeiro projeto para comecar.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white rounded-xl border border-zinc-200 overflow-x-auto">
+          <table className="w-full min-w-[500px]">
             <thead>
               <tr className="border-b border-zinc-100">
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3 w-10"></th>
@@ -55,7 +55,7 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
               {projects.map((project) => (
                 <tr
                   key={project.id}
-                  className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition-colors"
+                  className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition-colors min-h-[44px]"
                 >
                   <td className="px-4 py-3">
                     <div

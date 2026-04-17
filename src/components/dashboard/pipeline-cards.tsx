@@ -17,7 +17,7 @@ export function PipelineCards({ counts }: PipelineCardsProps) {
   return (
     <div>
       <h2 className="text-sm font-semibold text-zinc-900 mb-4">Pipeline</h2>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {counts.map((item) => (
           <Link
             key={item.status}

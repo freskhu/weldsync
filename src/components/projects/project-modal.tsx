@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
   return (
     <dialog
       ref={dialogRef}
-      className="w-full max-w-2xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+      className="w-[95vw] max-w-2xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm"
       onClick={(e) => {
         // Close on backdrop click
         if (e.target === dialogRef.current) onClose();
