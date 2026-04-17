@@ -27,6 +27,7 @@ export default async function PlanningPage() {
         initialPieces={pieces}
         projectMap={projectMap}
         robotMap={robotMap}
+        robots={robots}
       />
     </div>
   );

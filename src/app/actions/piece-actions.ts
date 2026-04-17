@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { pieceCreateSchema, pieceUpdateSchema } from "@/lib/validations/piece";
 import {
   createPiece as dbCreatePiece,
@@ -11,6 +12,8 @@ import {
   movePiece as dbMovePiece,
   linkProgram as dbLinkProgram,
   unlinkProgram as dbUnlinkProgram,
+  allocatePiece as dbAllocatePiece,
+  deallocatePiece as dbDeallocatePiece,
 } from "@/lib/data/store";
 import type { PieceStatus } from "@/lib/types";
 
@@ -222,5 +225,59 @@ export async function unlinkProgramFromPiece(
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath(`/projects/${piece.project_id}`);
+  return { success: true };
+}
+
+// --- Allocation actions ---
+
+const allocateSchema = z.object({
+  pieceId: z.string().min(1, "ID da peça em falta."),
+  robotId: z.coerce.number().int().positive("Robot inválido."),
+  date: z.string().date(),
+  period: z.enum(["AM", "PM"], { error: "Período deve ser AM ou PM." }),
+});
+
+export async function allocatePieceAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const raw = {
+    pieceId: formData.get("pieceId") as string,
+    robotId: formData.get("robotId") as string,
+    date: formData.get("date") as string,
+    period: formData.get("period") as string,
+  };
+
+  const result = allocateSchema.safeParse(raw);
+  if (!result.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of result.error.issues) {
+      const key = issue.path[0]?.toString() ?? "_root";
+      if (!fieldErrors[key]) fieldErrors[key] = [];
+      fieldErrors[key].push(issue.message);
+    }
+    return { success: false, fieldErrors };
+  }
+
+  const { pieceId, robotId, date, period } = result.data;
+
+  const piece = dbAllocatePiece(pieceId, robotId, date, period);
+  if (!piece) return { success: false, error: "Peça não encontrada." };
+
+  revalidatePath("/planning");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
+export async function deallocatePieceAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const pieceId = formData.get("pieceId") as string;
+  if (!pieceId) return { success: false, error: "ID da peça em falta." };
+
+  const piece = dbDeallocatePiece(pieceId);
+  if (!piece) return { success: false, error: "Peça não encontrada." };
+
+  revalidatePath("/planning");
+  revalidatePath("/robots");
   return { success: true };
 }

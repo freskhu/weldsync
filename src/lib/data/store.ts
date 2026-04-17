@@ -281,6 +281,54 @@ export function movePiece(
   return pieces[idx];
 }
 
+// --- Allocation ---
+
+/**
+ * Allocates a piece to a robot on a specific date and period.
+ * Sets status to 'allocated'.
+ */
+export function allocatePiece(
+  pieceId: string,
+  robotId: number,
+  date: string,
+  period: "AM" | "PM"
+): Piece | null {
+  return updatePiece(pieceId, {
+    status: "allocated",
+    robot_id: robotId,
+    scheduled_date: date,
+    scheduled_period: period,
+  });
+}
+
+/**
+ * Removes allocation from a piece, returning it to backlog.
+ */
+export function deallocatePiece(pieceId: string): Piece | null {
+  return updatePiece(pieceId, {
+    status: "backlog",
+    robot_id: null,
+    scheduled_date: null,
+    scheduled_period: null,
+  });
+}
+
+/**
+ * Returns the number of pieces allocated to a robot on a given date.
+ */
+export function getRobotLoad(robotId: number, date: string): number {
+  return pieces.filter(
+    (p) => p.robot_id === robotId && p.scheduled_date === date
+  ).length;
+}
+
+/**
+ * Returns all pieces allocated to a specific robot.
+ */
+export function getPiecesByRobot(robotId: number): Piece[] {
+  return pieces.filter((p) => p.robot_id === robotId);
+}
+
 // --- Program linking ---
 
 export function linkProgram(pieceId: string, programId: string): Piece | null {

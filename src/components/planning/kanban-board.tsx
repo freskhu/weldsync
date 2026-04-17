@@ -13,11 +13,15 @@ import {
   type DragEndEvent,
   type DragOverEvent,
 } from "@dnd-kit/core";
-import type { Piece, PieceStatus } from "@/lib/types";
-import { movePieceAction } from "@/app/actions/piece-actions";
+import type { Piece, PieceStatus, Robot } from "@/lib/types";
+import {
+  movePieceAction,
+  deallocatePieceAction,
+} from "@/app/actions/piece-actions";
 import { KanbanColumn } from "./kanban-column";
 import { PieceCard } from "./piece-card";
 import { KanbanFilters } from "./kanban-filters";
+import { AllocationModal } from "./allocation-modal";
 
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
@@ -31,16 +35,21 @@ interface KanbanBoardProps {
   initialPieces: Piece[];
   projectMap: Record<string, { name: string; color: string }>;
   robotMap: Record<number, string>;
+  robots: Robot[];
 }
 
 export function KanbanBoard({
   initialPieces,
   projectMap,
   robotMap,
+  robots,
 }: KanbanBoardProps) {
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+
+  // Allocation modal state
+  const [pendingAllocation, setPendingAllocation] = useState<Piece | null>(null);
 
   // Filters
   const [filterProject, setFilterProject] = useState<string>("");
@@ -131,6 +140,17 @@ export function KanbanBoard({
     [pieces, activeId]
   );
 
+  // Compute robot loads for the allocation modal date
+  const robotLoads = useMemo(() => {
+    const loads: Record<number, number> = {};
+    for (const robot of robots) {
+      loads[robot.id] = pieces.filter(
+        (p) => p.robot_id === robot.id
+      ).length;
+    }
+    return loads;
+  }, [pieces, robots]);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   }, []);
@@ -156,7 +176,51 @@ export function KanbanBoard({
       const piece = pieces.find((p) => p.id === pieceId);
       if (!piece || piece.status === targetStatus) return;
 
-      // Optimistic update
+      // If dropping on "allocated", open the allocation modal
+      if (targetStatus === "allocated") {
+        setPendingAllocation(piece);
+        return;
+      }
+
+      // If moving OUT of "allocated", deallocate (targetStatus !== "allocated" is guaranteed above)
+      if (piece.status === "allocated") {
+        const previousPieces = [...pieces];
+        setPieces((prev) =>
+          prev.map((p) =>
+            p.id === pieceId
+              ? {
+                  ...p,
+                  status: targetStatus,
+                  robot_id: null,
+                  scheduled_date: null,
+                  scheduled_period: null,
+                }
+              : p
+          )
+        );
+
+        // Deallocate first, then move to new status
+        const fd = new FormData();
+        fd.set("pieceId", pieceId);
+        const deallocResult = await deallocatePieceAction(fd);
+        if (!deallocResult.success) {
+          setPieces(previousPieces);
+          console.error("Failed to deallocate piece:", deallocResult.error);
+          return;
+        }
+
+        // If target is not backlog (deallocate sets backlog), move to actual target
+        if (targetStatus !== "backlog") {
+          const moveResult = await movePieceAction(pieceId, targetStatus);
+          if (!moveResult.success) {
+            setPieces(previousPieces);
+            console.error("Failed to move piece:", moveResult.error);
+          }
+        }
+        return;
+      }
+
+      // Standard move (non-allocation columns)
       const previousPieces = [...pieces];
       setPieces((prev) =>
         prev.map((p) =>
@@ -164,10 +228,8 @@ export function KanbanBoard({
         )
       );
 
-      // Server sync
       const result = await movePieceAction(pieceId, targetStatus);
       if (!result.success) {
-        // Revert on error
         setPieces(previousPieces);
         console.error("Failed to move piece:", result.error);
       }
@@ -178,6 +240,31 @@ export function KanbanBoard({
   const handleDragCancel = useCallback(() => {
     setActiveId(null);
     setOverId(null);
+  }, []);
+
+  const handleAllocationConfirm = useCallback(
+    (robotId: number, date: string, period: "AM" | "PM") => {
+      if (!pendingAllocation) return;
+      setPieces((prev) =>
+        prev.map((p) =>
+          p.id === pendingAllocation.id
+            ? {
+                ...p,
+                status: "allocated" as PieceStatus,
+                robot_id: robotId,
+                scheduled_date: date,
+                scheduled_period: period,
+              }
+            : p
+        )
+      );
+      setPendingAllocation(null);
+    },
+    [pendingAllocation]
+  );
+
+  const handleAllocationCancel = useCallback(() => {
+    setPendingAllocation(null);
   }, []);
 
   const hasFilters = !!(filterProject || filterRobot || filterUrgent);
@@ -253,6 +340,17 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Allocation modal */}
+      {pendingAllocation && (
+        <AllocationModal
+          piece={pendingAllocation}
+          robots={robots}
+          robotLoads={robotLoads}
+          onConfirm={handleAllocationConfirm}
+          onCancel={handleAllocationCancel}
+        />
+      )}
     </div>
   );
 }
