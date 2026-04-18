@@ -30,18 +30,18 @@ export function OccupancyChart({ weekData, monthData }: OccupancyChartProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-zinc-900">
-          Ocupação dos Robots
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+          Ocupacao dos Robots
         </h2>
-        <div className="flex rounded-lg border border-zinc-200 overflow-hidden">
+        <div className="inline-flex rounded-[10px] bg-slate-100 p-0.5">
           <button
             type="button"
             onClick={() => setPeriod("week")}
-            className={`px-3 py-1.5 text-xs font-medium min-h-[36px] transition-colors ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-[8px] min-h-[32px] transition-all ${
               period === "week"
-                ? "bg-zinc-900 text-white"
-                : "bg-white text-zinc-600 hover:bg-zinc-50"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
             }`}
           >
             Semana
@@ -49,13 +49,13 @@ export function OccupancyChart({ weekData, monthData }: OccupancyChartProps) {
           <button
             type="button"
             onClick={() => setPeriod("month")}
-            className={`px-3 py-1.5 text-xs font-medium min-h-[36px] transition-colors ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-[8px] min-h-[32px] transition-all ${
               period === "month"
-                ? "bg-zinc-900 text-white"
-                : "bg-white text-zinc-600 hover:bg-zinc-50"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            Mês
+            Mes
           </button>
         </div>
       </div>
@@ -64,15 +64,15 @@ export function OccupancyChart({ weekData, monthData }: OccupancyChartProps) {
           data={data}
           margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis
             dataKey="robotName"
-            tick={{ fontSize: 11, fill: "#71717a" }}
+            tick={{ fontSize: 11, fill: "#64748b" }}
             tickLine={false}
-            axisLine={{ stroke: "#e4e4e7" }}
+            axisLine={{ stroke: "#e2e8f0" }}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: "#71717a" }}
+            tick={{ fontSize: 11, fill: "#64748b" }}
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
@@ -80,34 +80,34 @@ export function OccupancyChart({ weekData, monthData }: OccupancyChartProps) {
           <Tooltip
             contentStyle={{
               fontSize: 12,
-              borderRadius: 8,
-              border: "1px solid #e4e4e7",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 4px 6px -1px rgba(0,0,0,0.07)",
             }}
             formatter={(value, name) => [
               `${value} meios-dias`,
-              name === "occupiedSlots" ? "Ocupado" : "Disponível",
+              name === "occupiedSlots" ? "Ocupado" : "Disponivel",
             ]}
             labelFormatter={(label) => `${label}`}
           />
           <Legend
             formatter={(value) =>
-              value === "occupiedSlots" ? "Ocupado" : "Disponível"
+              value === "occupiedSlots" ? "Ocupado" : "Disponivel"
             }
             wrapperStyle={{ fontSize: 11 }}
           />
           <Bar
             dataKey="occupiedSlots"
             stackId="a"
-            fill="#3B82F6"
+            fill="#6366f1"
             radius={[0, 0, 0, 0]}
             name="occupiedSlots"
           />
           <Bar
             dataKey="availableSlots"
             stackId="a"
-            fill="#E4E4E7"
-            radius={[4, 4, 0, 0]}
+            fill="#e2e8f0"
+            radius={[6, 6, 0, 0]}
             name="availableSlots"
           />
         </BarChart>

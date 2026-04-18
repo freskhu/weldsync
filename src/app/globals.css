@@ -3,4 +3,129 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* ----------------------------------------------------------------
+     WeldSync Design System — Monday.com inspired
+     Brand: Industrial teal-blue, vibrant status colors, warm surfaces
+     ---------------------------------------------------------------- */
+
+  /* Brand Colors */
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d9eaff;
+  --color-brand-200: #bcdbff;
+  --color-brand-300: #8ec5ff;
+  --color-brand-400: #59a4ff;
+  --color-brand-500: #3381f6;
+  --color-brand-600: #1d64eb;
+  --color-brand-700: #154fd8;
+  --color-brand-800: #1841af;
+  --color-brand-900: #1a3a89;
+
+  /* Surface Colors */
+  --color-surface-bg: #f8f9fb;
+  --color-surface-card: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-sidebar: #1b1f3b;
+  --color-surface-sidebar-hover: #272b4a;
+  --color-surface-sidebar-active: #323759;
+
+  /* Status Colors — Pipeline */
+  --color-status-backlog: #6b7280;
+  --color-status-backlog-bg: #f3f4f6;
+  --color-status-backlog-text: #374151;
+
+  --color-status-programmed: #6366f1;
+  --color-status-programmed-bg: #eef2ff;
+  --color-status-programmed-text: #4338ca;
+
+  --color-status-allocated: #a855f7;
+  --color-status-allocated-bg: #faf5ff;
+  --color-status-allocated-text: #7e22ce;
+
+  --color-status-production: #f59e0b;
+  --color-status-production-bg: #fffbeb;
+  --color-status-production-text: #b45309;
+
+  --color-status-completed: #22c55e;
+  --color-status-completed-bg: #f0fdf4;
+  --color-status-completed-text: #15803d;
+
+  /* Semantic Colors */
+  --color-danger: #ef4444;
+  --color-danger-bg: #fef2f2;
+  --color-danger-text: #b91c1c;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-warning-text: #92400e;
+  --color-success: #22c55e;
+  --color-success-bg: #f0fdf4;
+  --color-success-text: #15803d;
+  --color-info: #3b82f6;
+  --color-info-bg: #eff6ff;
+  --color-info-text: #1d4ed8;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+}
+
+/* ----------------------------------------------------------------
+   Base Styles
+   ---------------------------------------------------------------- */
+
+body {
+  background-color: var(--color-surface-bg);
+  color: #1e293b;
+}
+
+/* Scrollbar styling for a polished feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Focus ring utility */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--color-brand-200);
+  color: var(--color-brand-900);
+}
+
+/* Smooth transitions globally */
+button, a, input, select, textarea {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+/* Dialog backdrop */
+dialog::backdrop {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
 }

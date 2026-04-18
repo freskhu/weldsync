@@ -37,7 +37,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col lg:flex-row">
         <Sidebar />
-        <main className="flex-1 bg-zinc-50 min-h-screen">{children}</main>
+        <main className="flex-1 min-h-screen" style={{ backgroundColor: 'var(--color-surface-bg)' }}>{children}</main>
       </body>
     </html>
   );

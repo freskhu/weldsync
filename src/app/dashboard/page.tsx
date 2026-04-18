@@ -20,23 +20,26 @@ export default async function DashboardPage() {
     ]);
 
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-6">Dashboard</h1>
+    <div className="p-4 md:p-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+        <p className="text-sm text-slate-500 mt-1">Vista geral do planeamento</p>
+      </div>
 
-      {/* Pipeline counters — full width row */}
-      <div className="mb-6">
+      {/* Pipeline counters */}
+      <div className="mb-8">
         <PipelineCards counts={pipeline} />
       </div>
 
-      {/* 2x2 grid: charts + alerts */}
+      {/* Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
+        <div className="bg-white rounded-[14px] border border-slate-200/80 p-6" style={{ boxShadow: 'var(--shadow-sm)' }}>
           <OccupancyChart weekData={weekOccupancy} monthData={monthOccupancy} />
         </div>
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
+        <div className="bg-white rounded-[14px] border border-slate-200/80 p-6" style={{ boxShadow: 'var(--shadow-sm)' }}>
           <DeadlineAlerts alerts={alerts} />
         </div>
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5 lg:col-span-2">
+        <div className="bg-white rounded-[14px] border border-slate-200/80 p-6 lg:col-span-2" style={{ boxShadow: 'var(--shadow-sm)' }}>
           <ThroughputChart data={throughput} />
         </div>
       </div>
