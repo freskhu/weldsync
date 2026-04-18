@@ -181,40 +181,40 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 mb-4 flex-shrink-0">
         <button
           onClick={() => shiftWeeks(-1)}
-          className="px-3 py-1.5 text-sm font-medium bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors min-h-[44px] min-w-[44px]"
+          className="px-3.5 py-2 text-sm font-medium bg-[var(--color-surface-card)] border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-150 min-h-[44px] min-w-[44px] shadow-[var(--shadow-xs)]"
         >
           ← Anterior
         </button>
         <button
           onClick={goToday}
-          className="px-4 py-1.5 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors min-h-[44px]"
+          className="px-5 py-2 text-sm font-semibold bg-[var(--color-brand-600)] text-white rounded-xl hover:bg-[var(--color-brand-700)] transition-all duration-150 min-h-[44px] shadow-[var(--shadow-sm)]"
         >
           Hoje
         </button>
         <button
           onClick={() => shiftWeeks(1)}
-          className="px-3 py-1.5 text-sm font-medium bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors min-h-[44px] min-w-[44px]"
+          className="px-3.5 py-2 text-sm font-medium bg-[var(--color-surface-card)] border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-150 min-h-[44px] min-w-[44px] shadow-[var(--shadow-xs)]"
         >
           Seguinte →
         </button>
-        <span className="text-sm text-zinc-500 ml-2">
+        <span className="text-sm text-zinc-500 ml-2 font-medium">
           {days[0]?.date.slice(5)} — {days[days.length - 1]?.date.slice(5)}
         </span>
       </div>
 
       {/* Gantt grid */}
-      <div className="flex flex-1 min-h-0 border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="flex flex-1 min-h-0 border border-zinc-200 rounded-xl overflow-hidden bg-[var(--color-surface-card)] shadow-[var(--shadow-sm)]">
         {/* Fixed robot lane headers */}
         <div
-          className="flex-shrink-0 border-r border-zinc-200 bg-zinc-50"
+          className="flex-shrink-0 border-r border-zinc-200 bg-[var(--color-surface-bg)]"
           style={{ width: LANE_HEADER_WIDTH }}
         >
           {/* Empty corner for week + day header rows */}
           <div
-            className="border-b border-zinc-200 flex items-end px-3 pb-1 text-xs font-semibold text-zinc-500 uppercase tracking-wider"
+            className="border-b border-zinc-200 flex items-end px-3 pb-1.5 text-[11px] font-bold text-zinc-400 uppercase tracking-wider"
             style={{ height: WEEK_HEADER_HEIGHT + DAY_HEADER_HEIGHT }}
           >
             Robot
@@ -222,16 +222,16 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
           {robots.map((robot) => (
             <div
               key={robot.id}
-              className="border-b border-zinc-100 px-3 flex flex-col justify-center"
+              className="border-b border-zinc-100 px-3 flex flex-col justify-center hover:bg-white transition-colors duration-150"
               style={{ height: LANE_HEIGHT }}
             >
-              <span className="text-xs font-medium text-zinc-900 truncate block">
+              <span className="text-xs font-semibold text-zinc-900 truncate block">
                 {robot.name.split("—")[0].trim()}
               </span>
               <span className="text-[10px] text-zinc-500 truncate block">
                 {robot.name.split("—")[1]?.trim() ?? ""}
               </span>
-              <span className="text-[10px] text-zinc-400 mt-0.5">
+              <span className="inline-flex items-center text-[10px] text-zinc-400 bg-zinc-100 rounded-full px-1.5 py-0.5 mt-1 w-fit font-medium">
                 {(robot.capacity_kg / 1000).toFixed(0)}t
               </span>
             </div>
@@ -279,7 +279,7 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                   ref={day.isToday ? todayColRef : undefined}
                   className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
                     day.isToday
-                      ? "bg-blue-50 text-blue-700 font-semibold"
+                      ? "bg-[var(--color-brand-50)] text-[var(--color-brand-700)] font-bold"
                       : day.isWeekend
                         ? "bg-zinc-50 text-zinc-400"
                         : "text-zinc-600"
@@ -344,7 +344,7 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                         onClick={() =>
                           router.push(`/projects/${piece.project_id}`)
                         }
-                        className="absolute rounded-md text-left cursor-pointer transition-shadow hover:shadow-md hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
+                        className="absolute rounded-lg text-left cursor-pointer transition-all duration-150 hover:shadow-[var(--shadow-md)] hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-400)] focus:ring-offset-1"
                         style={{
                           left,
                           top,

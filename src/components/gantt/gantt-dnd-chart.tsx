@@ -128,7 +128,7 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
-      className={`absolute ${isOver ? "bg-blue-100/60 ring-1 ring-blue-300 rounded" : ""}`}
+      className={`absolute ${isOver ? "bg-[var(--color-brand-100)]/40 ring-1 ring-[var(--color-brand-300)] rounded-lg" : ""}`}
       style={{ inset: 0 }}
     >
       {children}

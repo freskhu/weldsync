@@ -15,15 +15,15 @@ const VIEWS: { id: CalendarView; label: string }[] = [
 
 export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   return (
-    <div className="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+    <div className="inline-flex rounded-xl border border-zinc-200 bg-[var(--color-surface-bg)] p-1 shadow-[var(--shadow-xs)]">
       {VIEWS.map((view) => (
         <button
           key={view.id}
           onClick={() => onViewChange(view.id)}
-          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors min-h-[44px] ${
+          className={`px-5 py-2 text-sm font-semibold rounded-[var(--radius-md)] transition-all duration-150 min-h-[44px] ${
             currentView === view.id
-              ? "bg-white text-zinc-900 shadow-sm"
-              : "text-zinc-500 hover:text-zinc-700"
+              ? "bg-[var(--color-brand-600)] text-white shadow-[var(--shadow-sm)]"
+              : "text-zinc-500 hover:text-zinc-700 hover:bg-white"
           }`}
         >
           {view.label}
