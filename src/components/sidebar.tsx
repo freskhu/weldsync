@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 /* SVG icon components — colored, not emoji */
 function IconDashboard({ active }: { active: boolean }) {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#60a5fa" : "#94a3b8"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#fff" : "#C5C9DE"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="7" height="9" rx="1.5" />
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
@@ -17,14 +17,14 @@ function IconDashboard({ active }: { active: boolean }) {
 }
 function IconProjects({ active }: { active: boolean }) {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#a78bfa" : "#94a3b8"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#fff" : "#C5C9DE"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
     </svg>
   );
 }
 function IconPlanning({ active }: { active: boolean }) {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#f59e0b" : "#94a3b8"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#fff" : "#C5C9DE"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <path d="M3 9h18M9 3v18" />
     </svg>
@@ -32,7 +32,7 @@ function IconPlanning({ active }: { active: boolean }) {
 }
 function IconCalendar({ active }: { active: boolean }) {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#22c55e" : "#94a3b8"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#fff" : "#C5C9DE"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path d="M16 2v4M8 2v4M3 10h18" />
     </svg>
@@ -40,7 +40,7 @@ function IconCalendar({ active }: { active: boolean }) {
 }
 function IconPrograms({ active }: { active: boolean }) {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#ec4899" : "#94a3b8"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#fff" : "#C5C9DE"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <path d="M14 2v6h6M10 13l2 2 4-4" />
     </svg>
@@ -48,23 +48,23 @@ function IconPrograms({ active }: { active: boolean }) {
 }
 function IconRobots({ active }: { active: boolean }) {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#06b6d4" : "#94a3b8"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={active ? "#fff" : "#C5C9DE"} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="10" rx="2" />
       <path d="M7 11V7a5 5 0 0110 0v4" />
-      <circle cx="8.5" cy="15.5" r="1" fill={active ? "#06b6d4" : "#94a3b8"} />
-      <circle cx="15.5" cy="15.5" r="1" fill={active ? "#06b6d4" : "#94a3b8"} />
+      <circle cx="8.5" cy="15.5" r="1" fill={active ? "#fff" : "#C5C9DE"} />
+      <circle cx="15.5" cy="15.5" r="1" fill={active ? "#fff" : "#C5C9DE"} />
       <path d="M9 19h6" />
     </svg>
   );
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, activeColor: "rgba(96, 165, 250, 0.15)" },
-  { href: "/projects", label: "Projetos", Icon: IconProjects, activeColor: "rgba(167, 139, 250, 0.15)" },
-  { href: "/planning", label: "Planeamento", Icon: IconPlanning, activeColor: "rgba(245, 158, 11, 0.15)" },
-  { href: "/calendar", label: "Calendario", Icon: IconCalendar, activeColor: "rgba(34, 197, 94, 0.15)" },
-  { href: "/programs", label: "Programas", Icon: IconPrograms, activeColor: "rgba(236, 72, 153, 0.15)" },
-  { href: "/robots", label: "Robots", Icon: IconRobots, activeColor: "rgba(6, 182, 212, 0.15)" },
+  { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, activeColor: "rgba(0, 115, 234, 0.18)" },
+  { href: "/projects", label: "Projetos", Icon: IconProjects, activeColor: "rgba(0, 115, 234, 0.18)" },
+  { href: "/planning", label: "Planeamento", Icon: IconPlanning, activeColor: "rgba(0, 115, 234, 0.18)" },
+  { href: "/calendar", label: "Calendário", Icon: IconCalendar, activeColor: "rgba(0, 115, 234, 0.18)" },
+  { href: "/programs", label: "Programas", Icon: IconPrograms, activeColor: "rgba(0, 115, 234, 0.18)" },
+  { href: "/robots", label: "Robots", Icon: IconRobots, activeColor: "rgba(0, 115, 234, 0.18)" },
 ];
 
 function NavList({ pathname }: { pathname: string }) {
@@ -76,10 +76,10 @@ function NavList({ pathname }: { pathname: string }) {
           <li key={item.href}>
             <Link
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 min-h-[44px] ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all duration-150 min-h-[44px] relative ${
                 isActive
-                  ? "text-white"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                  ? "text-white font-semibold"
+                  : "text-[#C5C9DE] hover:text-white hover:bg-[var(--color-sidebar-hover)]"
               }`}
               style={isActive ? { backgroundColor: item.activeColor } : undefined}
             >
@@ -97,7 +97,7 @@ function LogoMark() {
   return (
     <div className="flex items-center gap-3">
       {/* Logo icon */}
-      <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+      <div className="w-8 h-8 rounded-[9px] flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0073EA, #A25DDC)', boxShadow: '0 2px 6px rgba(0,115,234,0.35)' }}>
         <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
@@ -188,12 +188,12 @@ export function Sidebar() {
         {/* Bottom section */}
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, #FDAB3D, #E2445C)' }}>
               CM
             </div>
             <div>
-              <span className="text-sm font-medium text-white block leading-tight">Curval</span>
-              <span className="text-[10px] text-slate-500">Metalworks</span>
+              <span className="text-[13px] font-semibold text-white block leading-tight">Curval</span>
+              <span className="text-[11px] text-[#9699A6]">Metalworks</span>
             </div>
           </div>
         </div>

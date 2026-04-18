@@ -78,22 +78,25 @@ export function PipelineCards({ counts }: PipelineCardsProps) {
           <Link
             key={item.status}
             href={`/planning?status=${item.status}`}
-            className={`group relative flex flex-col rounded-[14px] border ${config.borderClass} ${config.bgClass} p-4 hover:shadow-md transition-all duration-150 min-h-[100px] overflow-hidden`}
+            className="group relative flex flex-col bg-white rounded-[14px] p-[18px] hover:-translate-y-0.5 hover:shadow-lg transition-all duration-150 min-h-[100px] overflow-hidden"
+            style={{ boxShadow: 'var(--shadow-card)' }}
           >
-            {/* Top accent bar */}
+            {/* Left accent bar */}
             <div
-              className="absolute top-0 left-0 right-0 h-1 rounded-t-[14px]"
+              className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[14px]"
               style={{ backgroundColor: item.color }}
             />
 
-            <div className={`${config.textClass} mb-3`}>
-              {config.icon}
+            <div className="flex items-center gap-2 mb-3">
+              <div style={{ color: item.color }}>
+                {config.icon}
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-ink-soft)' }}>
+                {item.label}
+              </span>
             </div>
-            <span className="text-2xl font-bold text-slate-900 leading-none">
+            <span className="text-[32px] font-extrabold leading-none tracking-tight" style={{ color: 'var(--color-ink)' }}>
               {item.count}
-            </span>
-            <span className="text-xs font-medium text-slate-500 mt-1.5">
-              {item.label}
             </span>
           </Link>
         );
