@@ -11,7 +11,7 @@ export function ProgramCard({ program, robot, templateName }: ProgramCardProps) 
   return (
     <Link
       href={`/programs/${program.id}`}
-      className="block bg-white border border-zinc-200 rounded-lg p-5 hover:border-zinc-400 hover:shadow-sm transition-all min-h-[44px]"
+      className="block bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-zinc-300 transition-all min-h-[44px]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -57,7 +57,7 @@ function FileTypeBadge({ type }: { type: "tp" | "ls" }) {
   const colors =
     type === "tp"
       ? "bg-blue-50 text-blue-700 border-blue-200"
-      : "bg-amber-50 text-amber-700 border-amber-200";
+      : "bg-green-50 text-green-700 border-green-200";
 
   return (
     <span
@@ -70,7 +70,7 @@ function FileTypeBadge({ type }: { type: "tp" | "ls" }) {
 
 function TemplateBadge() {
   return (
-    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
+    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-purple-50 text-purple-700 border-purple-200">
       Template
     </span>
   );

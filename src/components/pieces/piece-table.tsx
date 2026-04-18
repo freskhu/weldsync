@@ -195,12 +195,12 @@ export function PieceTable({ pieces, projectId, clientRef }: PieceTableProps) {
                       piece.status === "completed"
                         ? "bg-green-100 text-green-700"
                         : piece.status === "in_production"
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-amber-100 text-amber-700"
                         : piece.status === "allocated"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : piece.status === "programmed"
                         ? "bg-purple-100 text-purple-700"
-                        : "bg-zinc-100 text-zinc-600"
+                        : piece.status === "programmed"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-600"
                     }`}>
                       {piece.status === "backlog" && "Backlog"}
                       {piece.status === "programmed" && "Programada"}

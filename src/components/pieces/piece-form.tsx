@@ -70,7 +70,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Reference */}
         <div>
-          <label htmlFor="reference" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="reference" className="block text-sm font-medium text-gray-700 mb-1">
             Referencia *
           </label>
           <input
@@ -81,7 +81,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             onChange={(e) => setReference(e.target.value)}
             placeholder="VIG-01"
             required
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
           {state?.fieldErrors?.reference && (
             <p className="mt-1 text-sm text-red-600">{state.fieldErrors.reference[0]}</p>
@@ -90,7 +90,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
 
         {/* Material */}
         <div>
-          <label htmlFor="material" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="material" className="block text-sm font-medium text-gray-700 mb-1">
             Material
           </label>
           <input
@@ -99,13 +99,13 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             type="text"
             defaultValue={piece?.material ?? ""}
             placeholder="S355JR"
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
         </div>
 
         {/* Description */}
         <div className="md:col-span-2">
-          <label htmlFor="description" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
             Descricao
           </label>
           <input
@@ -113,13 +113,13 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             name="description"
             type="text"
             defaultValue={piece?.description ?? ""}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
         </div>
 
         {/* WPS */}
         <div>
-          <label htmlFor="wps" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="wps" className="block text-sm font-medium text-gray-700 mb-1">
             WPS
           </label>
           <input
@@ -128,13 +128,13 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             type="text"
             defaultValue={piece?.wps ?? ""}
             placeholder="WPS-001"
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
         </div>
 
         {/* Barcode */}
         <div>
-          <label htmlFor="barcode" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="barcode" className="block text-sm font-medium text-gray-700 mb-1">
             Codigo de Barras
           </label>
           <input
@@ -142,13 +142,13 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             name="barcode"
             type="text"
             defaultValue={piece?.barcode ?? ""}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
         </div>
 
         {/* Quantity */}
         <div>
-          <label htmlFor="quantity" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
             Quantidade *
           </label>
           <input
@@ -159,7 +159,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             step={1}
             defaultValue={piece?.quantity ?? 1}
             required
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
           {state?.fieldErrors?.quantity && (
             <p className="mt-1 text-sm text-red-600">{state.fieldErrors.quantity[0]}</p>
@@ -168,7 +168,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
 
         {/* Weight */}
         <div>
-          <label htmlFor="weight_kg" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="weight_kg" className="block text-sm font-medium text-gray-700 mb-1">
             Peso (kg)
           </label>
           <input
@@ -178,13 +178,13 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             min={0}
             step={0.1}
             defaultValue={piece?.weight_kg ?? ""}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
         </div>
 
         {/* Estimated Hours */}
         <div>
-          <label htmlFor="estimated_hours" className="block text-sm font-medium text-zinc-700 mb-1">
+          <label htmlFor="estimated_hours" className="block text-sm font-medium text-gray-700 mb-1">
             Horas Estimadas
           </label>
           <input
@@ -194,7 +194,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
             min={0}
             step={0.5}
             defaultValue={piece?.estimated_hours ?? ""}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
           />
         </div>
 
@@ -210,7 +210,7 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
               className="sr-only peer"
             />
             <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
-            <span className="ml-3 text-sm font-medium text-zinc-700">Urgente</span>
+            <span className="ml-3 text-sm font-medium text-gray-700">Urgente</span>
           </label>
         </div>
       </div>

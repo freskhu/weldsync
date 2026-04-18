@@ -57,7 +57,7 @@ export function RobotCards({ robots, allocations }: RobotCardsProps) {
                   {robot.capabilities.map((cap) => (
                     <span
                       key={cap}
-                      className="text-[10px] bg-zinc-100 text-zinc-600 rounded-full px-2 py-0.5"
+                      className="text-[10px] bg-blue-50 text-blue-700 rounded-full px-2.5 py-0.5 font-medium"
                     >
                       {cap}
                     </span>
