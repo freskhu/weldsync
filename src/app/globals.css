@@ -1,75 +1,75 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: 'Inter', var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', var(--font-geist-mono), ui-monospace, monospace;
 
   /* ----------------------------------------------------------------
-     WeldSync Design System — Monday.com inspired
-     Brand: Industrial teal-blue, vibrant status colors, warm surfaces
+     WeldSync Design System — Claude Design handoff (Monday.com style)
      ---------------------------------------------------------------- */
 
-  /* Brand Colors */
-  --color-brand-50: #eef6ff;
-  --color-brand-100: #d9eaff;
-  --color-brand-200: #bcdbff;
-  --color-brand-300: #8ec5ff;
-  --color-brand-400: #59a4ff;
-  --color-brand-500: #3381f6;
-  --color-brand-600: #1d64eb;
-  --color-brand-700: #154fd8;
-  --color-brand-800: #1841af;
-  --color-brand-900: #1a3a89;
-
-  /* Surface Colors */
-  --color-surface-bg: #f8f9fb;
-  --color-surface-card: #ffffff;
-  --color-surface-elevated: #ffffff;
-  --color-surface-sidebar: #1b1f3b;
-  --color-surface-sidebar-hover: #272b4a;
-  --color-surface-sidebar-active: #323759;
+  /* Brand */
+  --color-brand: #0073EA;
+  --color-brand-dark: #0060C2;
+  --color-brand-light: #CCE5FA;
+  --color-brand-50: #EBF5FF;
+  --color-brand-100: #CCE5FA;
+  --color-brand-500: #0073EA;
+  --color-brand-600: #0060C2;
+  --color-brand-700: #004D9B;
+  --color-brand-900: #002D5C;
 
   /* Status Colors — Pipeline */
-  --color-status-backlog: #6b7280;
-  --color-status-backlog-bg: #f3f4f6;
-  --color-status-backlog-text: #374151;
+  --color-status-backlog: #676879;
+  --color-status-backlog-bg: #E6E7EA;
+  --color-status-programmed: #0086C0;
+  --color-status-programmed-bg: #CFE7F5;
+  --color-status-allocated: #A25DDC;
+  --color-status-allocated-bg: #EADCF7;
+  --color-status-production: #FDAB3D;
+  --color-status-production-bg: #FFE7C7;
+  --color-status-completed: #00C875;
+  --color-status-completed-bg: #CAF4DF;
 
-  --color-status-programmed: #6366f1;
-  --color-status-programmed-bg: #eef2ff;
-  --color-status-programmed-text: #4338ca;
+  /* Urgency */
+  --color-danger: #E2445C;
+  --color-danger-bg: #FDD3D9;
+  --color-warning: #FDAB3D;
+  --color-warning-bg: #FFE7C7;
+  --color-success: #00C875;
+  --color-success-bg: #CAF4DF;
+  --color-info: #0073EA;
+  --color-info-bg: #CCE5FA;
 
-  --color-status-allocated: #a855f7;
-  --color-status-allocated-bg: #faf5ff;
-  --color-status-allocated-text: #7e22ce;
+  /* Neutrals */
+  --color-ink: #323338;
+  --color-ink-soft: #676879;
+  --color-ink-mute: #9699A6;
+  --color-line: #E6E9EF;
+  --color-line-soft: #F1F2F6;
+  --color-bg: #F6F7FB;
+  --color-surface: #FFFFFF;
 
-  --color-status-production: #f59e0b;
-  --color-status-production-bg: #fffbeb;
-  --color-status-production-text: #b45309;
+  /* Sidebar */
+  --color-sidebar: #1F2540;
+  --color-sidebar-hover: #2A3151;
+  --color-sidebar-active: rgba(0, 115, 234, 0.18);
 
-  --color-status-completed: #22c55e;
-  --color-status-completed-bg: #f0fdf4;
-  --color-status-completed-text: #15803d;
-
-  /* Semantic Colors */
-  --color-danger: #ef4444;
-  --color-danger-bg: #fef2f2;
-  --color-danger-text: #b91c1c;
-  --color-warning: #f59e0b;
-  --color-warning-bg: #fffbeb;
-  --color-warning-text: #92400e;
-  --color-success: #22c55e;
-  --color-success-bg: #f0fdf4;
-  --color-success-text: #15803d;
-  --color-info: #3b82f6;
-  --color-info-bg: #eff6ff;
-  --color-info-text: #1d4ed8;
+  /* Project Palette */
+  --color-proj-1: #0073EA;
+  --color-proj-2: #A25DDC;
+  --color-proj-3: #00C875;
+  --color-proj-4: #FDAB3D;
+  --color-proj-5: #E2445C;
+  --color-proj-6: #579BFC;
+  --color-proj-7: #00B5A5;
+  --color-proj-8: #FF7575;
 
   /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px rgba(32, 37, 50, 0.06);
+  --shadow-md: 0 2px 8px rgba(32, 37, 50, 0.08);
+  --shadow-lg: 0 8px 24px rgba(32, 37, 50, 0.10);
+  --shadow-card: 0 1px 3px rgba(32, 37, 50, 0.08), 0 0 0 1px rgba(32, 37, 50, 0.04);
 
   /* Radius */
   --radius-sm: 6px;
@@ -77,6 +77,13 @@
   --radius-lg: 14px;
   --radius-xl: 18px;
   --radius-full: 9999px;
+
+  /* Surface aliases for Tailwind */
+  --color-surface-bg: var(--color-bg);
+  --color-surface-card: var(--color-surface);
+  --color-surface-sidebar: var(--color-sidebar);
+  --color-surface-sidebar-hover: var(--color-sidebar-hover);
+  --color-surface-sidebar-active: var(--color-sidebar-active);
 }
 
 /* ----------------------------------------------------------------
@@ -84,44 +91,121 @@
    ---------------------------------------------------------------- */
 
 body {
-  background-color: var(--color-surface-bg);
-  color: #1e293b;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar styling for a polished feel */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #D0D4E0; border-radius: 5px; border: 2px solid var(--color-bg); }
+::-webkit-scrollbar-thumb:hover { background: #B5BAC9; }
+::-webkit-scrollbar-track { background: transparent; }
 
-/* Focus ring utility */
+/* Focus ring */
 *:focus-visible {
-  outline: 2px solid var(--color-brand-500);
+  outline: 2px solid var(--color-brand);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* Selection color */
+/* Selection */
 ::selection {
-  background-color: var(--color-brand-200);
-  color: var(--color-brand-900);
+  background-color: var(--color-brand-light);
+  color: var(--color-brand-dark);
 }
 
-/* Smooth transitions globally */
+/* Smooth transitions */
 button, a, input, select, textarea {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;
   transition-duration: 150ms;
   transition-timing-function: ease-out;
+}
+
+/* ----------------------------------------------------------------
+   Status pill classes (usable via className)
+   ---------------------------------------------------------------- */
+.pill-backlog { background: var(--color-status-backlog-bg); color: var(--color-status-backlog); }
+.pill-programmed { background: var(--color-status-programmed-bg); color: var(--color-status-programmed); }
+.pill-allocated { background: var(--color-status-allocated-bg); color: var(--color-status-allocated); }
+.pill-production { background: var(--color-status-production-bg); color: #B56E00; }
+.pill-completed { background: var(--color-status-completed-bg); color: #007A48; }
+
+/* Solid status pills (for column headers) */
+.pill-solid-backlog { background: var(--color-status-backlog); color: white; }
+.pill-solid-programmed { background: var(--color-status-programmed); color: white; }
+.pill-solid-allocated { background: var(--color-status-allocated); color: white; }
+.pill-solid-production { background: var(--color-status-production); color: white; }
+.pill-solid-completed { background: var(--color-status-completed); color: white; }
+
+/* File type pills */
+.pill-tp { background: #CFE7F5; color: #0060A0; }
+.pill-ls { background: #CAF4DF; color: #007A48; }
+.pill-template { background: #EADCF7; color: #7A3CBB; }
+
+/* Robot pill */
+.pill-robot { background: #EEF1FA; color: #4F5BA3; }
+
+/* Urgency pills */
+.pill-urgent { background: var(--color-danger-bg); color: var(--color-danger); }
+
+/* ----------------------------------------------------------------
+   Card base
+   ---------------------------------------------------------------- */
+.ws-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.ws-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ----------------------------------------------------------------
+   Status card (dashboard) with left accent bar
+   ---------------------------------------------------------------- */
+.status-card-accent::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+.status-card-accent.accent-backlog::before { background: var(--color-status-backlog); }
+.status-card-accent.accent-programmed::before { background: var(--color-status-programmed); }
+.status-card-accent.accent-allocated::before { background: var(--color-status-allocated); }
+.status-card-accent.accent-production::before { background: var(--color-status-production); }
+.status-card-accent.accent-completed::before { background: var(--color-status-completed); }
+
+/* ----------------------------------------------------------------
+   Kanban column headers
+   ---------------------------------------------------------------- */
+.kcol-backlog { background: var(--color-status-backlog); }
+.kcol-programmed { background: var(--color-status-programmed); }
+.kcol-allocated { background: var(--color-status-allocated); }
+.kcol-production { background: var(--color-status-production); }
+.kcol-completed { background: var(--color-status-completed); }
+
+/* ----------------------------------------------------------------
+   Gantt
+   ---------------------------------------------------------------- */
+.today-marker {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: var(--color-danger);
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------
+   Responsive — sidebar collapse on tablet
+   ---------------------------------------------------------------- */
+@media (max-width: 1280px) {
+  .sidebar-text { display: none; }
+  .sidebar-compact { width: 72px; }
 }
 
 /* Dialog backdrop */
