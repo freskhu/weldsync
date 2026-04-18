@@ -37,14 +37,14 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
   return (
     <dialog
       ref={dialogRef}
-      className="w-[95vw] max-w-2xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+      className="w-[95vw] max-w-2xl rounded-2xl bg-[var(--color-surface-card)] p-0 shadow-[var(--shadow-xl)] backdrop:bg-black/50 backdrop:backdrop-blur-sm border border-zinc-200"
       onClick={(e) => {
         // Close on backdrop click
         if (e.target === dialogRef.current) onClose();
       }}
     >
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-100">
           <h2 className="text-lg font-semibold text-zinc-900">{title}</h2>
           <button
             type="button"

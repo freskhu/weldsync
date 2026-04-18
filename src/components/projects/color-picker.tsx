@@ -23,17 +23,17 @@ export function ColorPicker({ value, onChange, name = "color" }: ColorPickerProp
   return (
     <div>
       <input type="hidden" name={name} value={value} />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2.5">
         {PRESET_COLORS.map((c) => (
           <button
             key={c.hex}
             type="button"
-            title={c.name}
+            aria-label={c.name}
             onClick={() => onChange(c.hex)}
-            className={`w-9 h-9 rounded-lg border-2 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center ${
+            className={`w-8 h-8 rounded-lg border-2 transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center ${
               value === c.hex
-                ? "border-zinc-900 scale-110 ring-2 ring-zinc-900/20"
-                : "border-transparent hover:border-zinc-300"
+                ? "border-zinc-900 scale-110 ring-2 ring-[var(--color-brand-500)]/30 shadow-[var(--shadow-sm)]"
+                : "border-transparent hover:border-zinc-300 hover:scale-105"
             }`}
             style={{ backgroundColor: c.hex }}
           >

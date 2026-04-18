@@ -33,14 +33,14 @@ export function ArchiveButton({ projectId, projectName }: ArchiveButtonProps) {
           type="button"
           onClick={handleArchive}
           disabled={isPending}
-          className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+          className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-danger)] rounded-xl hover:bg-red-700 disabled:opacity-50 transition-all duration-150 min-h-[44px]"
         >
           {isPending ? "..." : "Confirmar"}
         </button>
         <button
           type="button"
           onClick={() => setShowConfirm(false)}
-          className="px-3 py-1.5 text-sm font-medium text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 min-h-[44px]"
+          className="px-3 py-1.5 text-sm font-medium text-zinc-600 bg-zinc-100 rounded-xl hover:bg-zinc-200 transition-all duration-150 min-h-[44px]"
         >
           Cancelar
         </button>

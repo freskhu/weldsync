@@ -35,7 +35,7 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-4 h-4 rounded-full flex-shrink-0"
+              className="w-4 h-4 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm"
               style={{ backgroundColor: project.color }}
             />
             <div>
@@ -50,7 +50,7 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
             <button
               type="button"
               onClick={() => setShowEdit(true)}
-              className="px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 min-h-[44px]"
+              className="px-4 py-2 text-sm font-medium text-zinc-700 bg-[var(--color-surface-card)] border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-zinc-300 shadow-[var(--shadow-xs)] transition-all duration-150 min-h-[44px]"
             >
               Editar
             </button>
@@ -61,7 +61,7 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
 
       {/* Project info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-zinc-200 p-4">
+        <div className="bg-[var(--color-surface-card)] rounded-xl border border-zinc-200 p-4 shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-sm)] transition-shadow duration-150">
           <p className="text-xs text-zinc-500 uppercase tracking-wider">Prazo</p>
           <p className="text-lg font-semibold text-zinc-900 mt-1">
             {project.deadline
@@ -69,17 +69,17 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
               : "Sem prazo"}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-zinc-200 p-4">
+        <div className="bg-[var(--color-surface-card)] rounded-xl border border-zinc-200 p-4 shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-sm)] transition-shadow duration-150">
           <p className="text-xs text-zinc-500 uppercase tracking-wider">Pecas</p>
           <p className="text-lg font-semibold text-zinc-900 mt-1">{pieces.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-zinc-200 p-4">
+        <div className="bg-[var(--color-surface-card)] rounded-xl border border-zinc-200 p-4 shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-sm)] transition-shadow duration-150">
           <p className="text-xs text-zinc-500 uppercase tracking-wider">Peso Total</p>
           <p className="text-lg font-semibold text-zinc-900 mt-1">
             {pieces.reduce((sum, p) => sum + (p.weight_kg ?? 0) * p.quantity, 0).toLocaleString("pt-PT")} kg
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-zinc-200 p-4">
+        <div className="bg-[var(--color-surface-card)] rounded-xl border border-zinc-200 p-4 shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-sm)] transition-shadow duration-150">
           <p className="text-xs text-zinc-500 uppercase tracking-wider">Horas Est.</p>
           <p className="text-lg font-semibold text-zinc-900 mt-1">
             {pieces.reduce((sum, p) => sum + (p.estimated_hours ?? 0) * p.quantity, 0).toLocaleString("pt-PT")}h
@@ -89,7 +89,7 @@ export function ProjectDetail({ project, pieces }: ProjectDetailProps) {
 
       {/* Notes */}
       {project.notes && (
-        <div className="bg-white rounded-xl border border-zinc-200 p-4">
+        <div className="bg-[var(--color-surface-card)] rounded-xl border border-zinc-200 p-4 shadow-[var(--shadow-xs)]">
           <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Notas</p>
           <p className="text-sm text-zinc-700 whitespace-pre-wrap">{project.notes}</p>
         </div>

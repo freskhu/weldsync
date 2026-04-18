@@ -38,7 +38,7 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
             defaultValue={project?.client_ref ?? ""}
             placeholder="CRV-2024-XXX"
             required
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
           />
           {state?.fieldErrors?.client_ref && (
             <p className="mt-1 text-sm text-red-600">{state.fieldErrors.client_ref[0]}</p>
@@ -56,7 +56,7 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
             type="text"
             defaultValue={project?.name ?? ""}
             required
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
           />
           {state?.fieldErrors?.name && (
             <p className="mt-1 text-sm text-red-600">{state.fieldErrors.name[0]}</p>
@@ -74,7 +74,7 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
             type="text"
             defaultValue={project?.client_name ?? ""}
             required
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
           />
           {state?.fieldErrors?.client_name && (
             <p className="mt-1 text-sm text-red-600">{state.fieldErrors.client_name[0]}</p>
@@ -91,7 +91,7 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
             name="deadline"
             type="date"
             defaultValue={project?.deadline ?? ""}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
           />
         </div>
       </div>
@@ -112,7 +112,7 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
           name="notes"
           rows={3}
           defaultValue={project?.notes ?? ""}
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+          className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] resize-y"
         />
       </div>
 
@@ -121,14 +121,14 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 min-h-[44px]"
+          className="px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-150 min-h-[44px]"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="px-5 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 disabled:opacity-50 min-h-[44px]"
+          className="px-5 py-2.5 text-sm font-semibold text-white bg-[var(--color-brand-600)] rounded-xl hover:bg-[var(--color-brand-700)] shadow-[var(--shadow-sm)] disabled:opacity-50 transition-all duration-150 min-h-[44px]"
         >
           {isPending ? "A guardar..." : project ? "Guardar" : "Criar Projeto"}
         </button>

@@ -27,7 +27,7 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 min-h-[44px]"
+          className="px-4 py-2.5 text-sm font-semibold text-white bg-[var(--color-brand-600)] rounded-xl hover:bg-[var(--color-brand-700)] shadow-[var(--shadow-sm)] transition-all duration-150 min-h-[44px]"
         >
           + Novo Projeto
         </button>
@@ -39,7 +39,7 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
           <p className="text-sm mt-1">Cria o primeiro projeto para comecar.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-zinc-200 overflow-x-auto">
+        <div className="bg-[var(--color-surface-card)] rounded-xl border border-zinc-200 overflow-x-auto shadow-[var(--shadow-sm)]">
           <table className="w-full min-w-[500px]">
             <thead>
               <tr className="border-b border-zinc-100">
@@ -55,11 +55,11 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
               {projects.map((project) => (
                 <tr
                   key={project.id}
-                  className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition-colors min-h-[44px]"
+                  className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50 hover:shadow-[var(--shadow-md)] transition-all duration-150 min-h-[44px]"
                 >
                   <td className="px-4 py-3">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-3.5 h-3.5 rounded-full ring-2 ring-white shadow-sm"
                       style={{ backgroundColor: project.color }}
                     />
                   </td>
