@@ -98,11 +98,31 @@ export function PieceCard({
           </div>
         </div>
 
-        {/* Row 2: Project name */}
-        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
+        {/* Row 2: Piece description (what we're welding) */}
+        {piece.description && (
+          <p className="text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
+            {piece.description}
+          </p>
+        )}
 
-        {/* Row 3: Metadata pills */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+        {/* Row 3: Project name */}
+        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
+
+        {/* Row 4: Material + Weight */}
+        {(piece.material || piece.weight_kg != null) && (
+          <div className="flex items-center gap-2 mt-1.5 text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
+            {piece.material && (
+              <span className="truncate">{piece.material}</span>
+            )}
+            {piece.material && piece.weight_kg != null && <span>·</span>}
+            {piece.weight_kg != null && (
+              <span className="shrink-0">{piece.weight_kg} kg</span>
+            )}
+          </div>
+        )}
+
+        {/* Row 5: Metadata pills */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'var(--color-line-soft)' }}>
           {robotName && (
             <span className="inline-flex items-center text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
               {robotName}
