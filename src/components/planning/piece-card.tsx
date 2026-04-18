@@ -61,19 +61,19 @@ export function PieceCard({
         min-h-[44px] touch-manipulation select-none
         transition-all duration-150
         ${isDragging ? "opacity-30" : ""}
-        ${isOverlay ? "shadow-xl ring-2 ring-[var(--color-brand-400)] rotate-2" : "shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)]"}
+        ${isOverlay ? "shadow-xl ring-2 ring-[var(--color-brand-400)] rotate-2" : "hover:-translate-y-px hover:shadow-md"}
       `}
     >
       {/* Left border colored by project */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl"
         style={{ backgroundColor: projectColor }}
       />
 
       <div className="pl-4 pr-3 py-3">
         {/* Row 1: Reference + urgency + program status */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-bold text-zinc-900 truncate">
+          <span className="text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
             {piece.reference}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -99,12 +99,12 @@ export function PieceCard({
         </div>
 
         {/* Row 2: Project name */}
-        <p className="text-xs text-zinc-500 truncate mt-0.5">{projectName}</p>
+        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
 
         {/* Row 3: Metadata pills */}
         <div className="flex flex-wrap items-center gap-1.5 mt-2">
           {robotName && (
-            <span className="inline-flex items-center text-[10px] font-medium bg-[var(--color-status-allocated-bg)] text-[var(--color-status-allocated-text)] rounded-full px-2 py-0.5 truncate max-w-[120px]">
+            <span className="inline-flex items-center text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
               {robotName}
             </span>
           )}

@@ -36,15 +36,25 @@ export function KanbanColumn({
         isOver ? "bg-[var(--color-brand-50)] ring-2 ring-[var(--color-brand-300)] shadow-[var(--shadow-md)]" : ""
       }`}
     >
-      {/* Color bar */}
-      <div className="h-1.5 rounded-t-xl" style={{ backgroundColor: colors.bar }} />
-      <div className="flex items-center justify-between px-4 py-3">
-        <h2 className="text-sm font-bold text-zinc-800">{label}</h2>
-        <span className={`text-[11px] font-bold ${colors.badge} ${colors.badgeText} rounded-full px-2.5 py-0.5`}>
+      {/* Solid color header */}
+      <div
+        className="flex items-center justify-between px-3.5 py-2.5 rounded-t-[10px] text-white font-bold text-[13px] tracking-wide"
+        style={{ background: colors.bar }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-white/40" />
+          {label}
+        </div>
+        <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-[10px] min-w-[20px] text-center">
           {count}
         </span>
       </div>
-      <div className="flex-1 overflow-y-auto px-2.5 pb-2.5 space-y-2">{children}</div>
+      <div
+        className="flex-1 overflow-y-auto p-2.5 space-y-2 border border-t-0 rounded-b-[10px] min-h-[120px]"
+        style={{ background: 'rgba(255,255,255,0.55)', borderColor: 'var(--color-line)' }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
