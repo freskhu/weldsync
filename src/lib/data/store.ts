@@ -293,6 +293,70 @@ export async function getPiecesByRobot(robotId: number): Promise<Piece[]> {
   return data ?? [];
 }
 
+/**
+ * Returns a single robot by ID.
+ */
+export async function getRobotById(id: number): Promise<Robot | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("robot")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`getRobotById: ${error.message}`);
+  }
+  return data;
+}
+
+/**
+ * Creates a new robot.
+ */
+export async function createRobot(
+  data: Omit<Robot, "id" | "created_at" | "updated_at">
+): Promise<Robot> {
+  const supabase = await createServerSupabaseClient();
+  const { data: robot, error } = await supabase
+    .from("robot")
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw new Error(`createRobot: ${error.message}`);
+  return robot;
+}
+
+/**
+ * Updates an existing robot.
+ */
+export async function updateRobot(
+  id: number,
+  data: Partial<Omit<Robot, "id" | "created_at" | "updated_at">>
+): Promise<Robot> {
+  const supabase = await createServerSupabaseClient();
+  const { data: robot, error } = await supabase
+    .from("robot")
+    .update(data)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(`updateRobot: ${error.message}`);
+  return robot;
+}
+
+/**
+ * Deletes a robot (only if no pieces are allocated to it).
+ */
+export async function deleteRobot(id: number): Promise<void> {
+  const supabase = await createServerSupabaseClient();
+  const pieces = await getPiecesByRobot(id);
+  if (pieces.length > 0) {
+    throw new Error(`Não é possível eliminar: ${pieces.length} peça(s) alocada(s) a este robot.`);
+  }
+  const { error } = await supabase.from("robot").delete().eq("id", id);
+  if (error) throw new Error(`deleteRobot: ${error.message}`);
+}
+
 // --- Program linking ---
 
 export async function linkProgram(
