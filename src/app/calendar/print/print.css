@@ -117,51 +117,96 @@
 
 .print-gantt {
   width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
   font-size: 8pt;
-}
-
-.print-gantt th,
-.print-gantt td {
   border: 0.5pt solid #a1a1aa;
-  padding: 0;
-  vertical-align: top;
+  border-collapse: collapse;
 }
 
-.print-gantt thead th {
+/* Header ------------------------------------------------------------- */
+
+.print-gantt-header {
+  display: flex;
   background: #f4f4f5;
+  border-bottom: 0.5pt solid #a1a1aa;
   font-weight: 600;
-  padding: 1.5mm 1mm;
-  text-align: center;
 }
 
-.print-gantt .print-gantt-robot-col {
+.print-gantt-header-robot {
   width: 28mm;
+  flex: 0 0 28mm;
+  padding: 1.5mm 1.5mm;
+  border-right: 0.5pt solid #a1a1aa;
+  box-sizing: border-box;
 }
 
-.print-gantt .print-gantt-day {
-  padding: 1mm;
+.print-gantt-days-header {
+  flex: 1;
+  display: flex;
+}
+
+.print-gantt-day-header {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 1mm 0.5mm 0.5mm;
+  border-left: 0.5pt solid #d4d4d8;
+  text-align: center;
+  box-sizing: border-box;
+}
+.print-gantt-day-header:first-child {
+  border-left: 0;
+}
+
+.print-gantt-day-label {
+  display: block;
   font-size: 8pt;
 }
 
-.print-gantt .print-gantt-day-weekend {
-  background: #f4f4f5;
-  color: #a1a1aa;
+.print-gantt-day-subslots {
+  display: flex;
+  justify-content: space-around;
+  font-size: 6pt;
+  font-weight: 500;
+  color: #71717a;
+  margin-top: 0.5mm;
 }
 
-.print-gantt .print-gantt-robot-cell {
+.print-gantt-day-subslots > span {
+  flex: 1;
+}
+
+/* Body --------------------------------------------------------------- */
+
+.print-gantt-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.print-gantt-row {
+  display: flex;
+  border-top: 0.5pt solid #d4d4d8;
+}
+.print-gantt-row:first-child {
+  border-top: 0;
+}
+
+.print-gantt-robot-cell {
+  width: 28mm;
+  flex: 0 0 28mm;
   padding: 1.5mm;
   background: #fafafa;
   font-weight: 600;
   font-size: 8pt;
-  vertical-align: middle;
+  border-right: 0.5pt solid #a1a1aa;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.print-gantt .print-gantt-robot-name {
+.print-gantt-robot-name {
   display: block;
 }
-.print-gantt .print-gantt-robot-capacity {
+.print-gantt-robot-capacity {
   display: block;
   font-weight: 400;
   font-size: 7pt;
@@ -169,42 +214,58 @@
   margin-top: 0.5mm;
 }
 
-.print-gantt-cell {
-  min-height: 12mm;
-  padding: 0;
+/* Lane area holds the grid background + absolutely-positioned blocks. */
+.print-gantt-lane-area {
+  flex: 1;
   position: relative;
+  min-width: 0;
 }
 
-.print-gantt-slot {
-  min-height: 6mm;
-  padding: 0.5mm;
-  position: relative;
-}
-
-.print-gantt-slot + .print-gantt-slot {
-  border-top: 0.5pt dashed #d4d4d8;
-}
-
-.print-gantt-slot-label {
+.print-gantt-grid {
   position: absolute;
-  top: 0.3mm;
-  left: 0.5mm;
-  font-size: 6pt;
-  color: #a1a1aa;
-  text-transform: uppercase;
-  font-weight: 600;
-  pointer-events: none;
+  inset: 0;
+  display: flex;
 }
+
+.print-gantt-grid-day {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  border-left: 0.5pt solid #e4e4e7;
+}
+.print-gantt-grid-day:first-child {
+  border-left: 0;
+}
+
+.print-gantt-grid-slot {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.print-gantt-grid-slot + .print-gantt-grid-slot {
+  border-left: 0.5pt dashed #e4e4e7;
+}
+
+.print-gantt-day-weekend {
+  background: #f4f4f5;
+  color: #a1a1aa;
+}
+
+/* Blocks ------------------------------------------------------------- */
 
 .print-gantt-block {
+  position: absolute;
   border: 0.5pt solid #18181b;
-  padding: 0.8mm 1.2mm;
-  margin-top: 1.8mm;
+  padding: 0.4mm 1mm;
   border-radius: 0.8mm;
   font-size: 7pt;
-  line-height: 1.15;
+  line-height: 1.1;
   color: #fff;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
   /* Pattern fallback for greyscale printing: subtle diagonal lines */
   background-image: repeating-linear-gradient(
     45deg,
@@ -216,21 +277,27 @@
   background-blend-mode: multiply;
 }
 
-.print-gantt-block + .print-gantt-block {
-  margin-top: 0.8mm;
-}
-
-.print-gantt-block-ref {
+.print-gantt-block-label {
   font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  font-weight: 700;
-  font-size: 7pt;
-  display: block;
+  font-weight: 600;
+  font-size: 6.8pt;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
 }
 
-.print-gantt-block-client {
-  display: block;
-  font-size: 6.5pt;
-  opacity: 0.9;
+/* Clamp indicators: dashed edge on the clamped side so the reader knows
+   the piece continues outside the visible window. */
+.print-gantt-block-clamp-left {
+  border-left-style: dashed;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.print-gantt-block-clamp-right {
+  border-right-style: dashed;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 /* ---------------------------------------------------------------- */

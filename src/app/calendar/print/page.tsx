@@ -123,15 +123,11 @@ export default async function CalendarPrintPage({
     }
   }
 
-  // Filter pieces that intersect the range
-  // - Gantt uses scheduled_date (hard allocation, M/T == AM/PM)
-  // - Table prefers planned_* range; falls back to scheduled if not set
-  const scheduledInRange: Piece[] = pieces.filter((p) => {
-    if (!p.robot_id || !p.scheduled_date) return false;
-    return p.scheduled_date >= startISO && p.scheduled_date <= endISO;
-  });
-
-  // For the table: union of scheduled + planned within range
+  // Filter pieces that intersect the range.
+  // Both the Gantt and the table now use the same data source: any piece with
+  // a robot assignment whose planned range (or legacy scheduled date) overlaps
+  // the visible window. The Gantt renders pieces as multi-slot spans; the
+  // table lists them row-by-row.
   const tableRows: Piece[] = pieces.filter((p) => {
     if (!p.robot_id) return false;
     const hasPlanned = !!p.planned_start_date && !!p.planned_end_date;
@@ -146,6 +142,7 @@ export default async function CalendarPrintPage({
     }
     return false;
   });
+  const ganttPieces: Piece[] = tableRows;
 
   // Project lookup
   const projectMap: Record<string, Project> = {};
@@ -193,7 +190,7 @@ export default async function CalendarPrintPage({
         <PrintGantt
           robots={robots}
           days={days}
-          pieces={scheduledInRange}
+          pieces={ganttPieces}
           projectMap={projectMap}
         />
       </section>
