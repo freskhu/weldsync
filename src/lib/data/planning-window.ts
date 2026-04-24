@@ -10,8 +10,15 @@ import type { PlanningWindow } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 /**
- * Returns the currently active planning window, or null if none exists
- * (e.g. the seed has not yet been applied).
+ * Returns the currently active planning window, or null if none exists.
+ *
+ * Resilient to two failure modes that must NOT break the UI:
+ *  1. Table doesn't exist yet (migration 00005 not applied) → PostgREST code
+ *     "PGRST205" (schema cache miss) or Postgres "42P01" (undefined_table).
+ *  2. Table exists but has no active row → maybeSingle() returns null cleanly.
+ *
+ * In both cases we return null so the page renders the "no active window"
+ * banner instead of crashing the Server Component with a 500.
  */
 export async function getActivePlanningWindow(): Promise<PlanningWindow | null> {
   const supabase = await createServerSupabaseClient();
@@ -20,7 +27,18 @@ export async function getActivePlanningWindow(): Promise<PlanningWindow | null> 
     .select("*")
     .eq("is_active", true)
     .maybeSingle();
-  if (error) throw new Error(`getActivePlanningWindow: ${error.message}`);
+
+  if (error) {
+    // Treat "table missing" as "no active window" so the app keeps working
+    // before the migration is applied. Any other error is still surfaced.
+    if (error.code === "PGRST205" || error.code === "42P01") {
+      return null;
+    }
+    // Log so the cause stays visible in Vercel logs, but don't throw:
+    // a planning window is non-critical for page rendering.
+    console.error("[getActivePlanningWindow] unexpected error", error);
+    return null;
+  }
   return data;
 }
 
@@ -56,7 +74,10 @@ export async function updateActivePlanningWindow(
     .single();
 
   if (error) {
+    // Row not found → signal "no active window" to the caller.
     if (error.code === "PGRST116") return null;
+    // Table missing → same treatment; the UI will keep showing the banner.
+    if (error.code === "PGRST205" || error.code === "42P01") return null;
     throw new Error(`updateActivePlanningWindow: ${error.message}`);
   }
   return data;
