@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   updatePlanningWindowAction,
   type PlanningWindowActionState,
@@ -20,9 +20,11 @@ interface PlanningWindowBarProps {
  * - Server-action validation via useActionState; errors render inline.
  * - If no active window exists (migration not applied), shows a banner.
  *
- * Note: `editing` is derived — if the last action succeeded, collapse the
- * editor. This avoids a setState-in-effect anti-pattern and is compatible
- * with the Next.js strict-mode lint rules.
+ * The `userWantsEdit` flag is the single source of truth for whether the
+ * form is open. A useEffect observes successful saves and collapses the
+ * form once per transition, so clicking "Editar" again always reopens it
+ * even if the server state still carries `success: true` from the last
+ * save.
  */
 export function PlanningWindowBar({ window }: PlanningWindowBarProps) {
   const [userWantsEdit, setUserWantsEdit] = useState(false);
@@ -31,10 +33,20 @@ export function PlanningWindowBar({ window }: PlanningWindowBarProps) {
     FormData
   >(updatePlanningWindowAction, null);
 
-  // Collapse automatically after a successful save. The `userWantsEdit` flag
-  // is reset by the button handlers, so opening the editor again works
-  // normally even after the revalidated data arrives.
-  const editing = userWantsEdit && !state?.success;
+  // Collapse the form once after each successful save. We guard with a ref
+  // so the effect only fires on the transition, not on every re-render
+  // while `state.success` remains truthy.
+  const handledSuccessRef = useRef(false);
+  useEffect(() => {
+    if (state?.success && !handledSuccessRef.current) {
+      handledSuccessRef.current = true;
+      setUserWantsEdit(false);
+    } else if (!state?.success) {
+      handledSuccessRef.current = false;
+    }
+  }, [state?.success]);
+
+  const editing = userWantsEdit;
 
   if (!window) {
     return (

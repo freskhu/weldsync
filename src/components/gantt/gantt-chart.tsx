@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { Piece, Robot } from "@/lib/types";
+import type { Piece, PlanningWindow, Robot } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,6 +12,7 @@ interface GanttChartProps {
   pieces: Piece[];
   robots: Robot[];
   projectMap: Record<string, { name: string; color: string }>;
+  planningWindow: PlanningWindow | null;
 }
 
 interface DayColumn {
@@ -20,6 +21,7 @@ interface DayColumn {
   dayOfWeek: number; // 0=Sun ... 6=Sat
   isToday: boolean;
   isWeekend: boolean;
+  isInWindow: boolean;
   weekLabel: string | null; // shown on the first day of each week
 }
 
@@ -58,7 +60,12 @@ function isoWeek(d: Date): number {
   return Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-function buildDays(startMonday: Date, weeks: number): DayColumn[] {
+function buildDays(
+  startMonday: Date,
+  weeks: number,
+  windowStart: string | null,
+  windowEnd: string | null
+): DayColumn[] {
   const totalDays = weeks * 7;
   const todayStr = formatDateISO(new Date());
   const days: DayColumn[] = [];
@@ -68,23 +75,44 @@ function buildDays(startMonday: Date, weeks: number): DayColumn[] {
     const dateStr = formatDateISO(d);
     const dow = d.getDay();
     const isMonday = dow === 1;
+    const isInWindow =
+      windowStart !== null && windowEnd !== null
+        ? dateStr >= windowStart && dateStr <= windowEnd
+        : true;
     days.push({
       date: dateStr,
       label: `${DAY_NAMES_PT[dow]} ${d.getDate()}`,
       dayOfWeek: dow,
       isToday: dateStr === todayStr,
       isWeekend: dow === 0 || dow === 6,
+      isInWindow,
       weekLabel: isMonday ? `Sem ${isoWeek(d)}` : null,
     });
   }
   return days;
 }
 
+/**
+ * Weeks needed to cover the planning window starting from the Monday before
+ * (or equal to) `windowStart`. Always returns at least `minWeeks`.
+ */
+function weeksForWindow(
+  windowStart: string,
+  windowEnd: string,
+  minWeeks: number
+): number {
+  const start = getMonday(new Date(windowStart + "T00:00:00"));
+  const end = new Date(windowEnd + "T00:00:00");
+  const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+  const weeks = Math.ceil(diffDays / 7);
+  return Math.max(weeks, minWeeks);
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const WEEKS_VISIBLE = 3;
+const MIN_WEEKS_VISIBLE = 3;
 const LANE_HEADER_WIDTH = 160; // px — narrower for iPad
 const DAY_COL_WIDTH = 72; // px — slightly narrower for iPad
 const LANE_HEIGHT = 96; // px — split into AM (top 48) + PM (bottom 48), meets 44px touch target
@@ -96,15 +124,55 @@ const DAY_HEADER_HEIGHT = 32;
 // Component
 // ---------------------------------------------------------------------------
 
-export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
+export function GanttChart({
+  pieces,
+  robots,
+  projectMap,
+  planningWindow,
+}: GanttChartProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const todayColRef = useRef<HTMLDivElement>(null);
+  const windowStartColRef = useRef<HTMLDivElement>(null);
 
-  // Current view start (always a Monday)
-  const [viewStart, setViewStart] = useState<Date>(() => getMonday(new Date()));
+  // Initial view: Monday on/before the window start. Falls back to today's
+  // Monday when no window exists.
+  const [viewStart, setViewStart] = useState<Date>(() => {
+    if (planningWindow) {
+      return getMonday(new Date(planningWindow.start_date + "T00:00:00"));
+    }
+    return getMonday(new Date());
+  });
 
-  const days = useMemo(() => buildDays(viewStart, WEEKS_VISIBLE), [viewStart]);
+  // If the active window changes (after a save), snap the view back to it.
+  useEffect(() => {
+    if (planningWindow) {
+      setViewStart(getMonday(new Date(planningWindow.start_date + "T00:00:00")));
+    }
+  }, [planningWindow?.start_date, planningWindow?.id]);
+
+  // Number of weeks derives from the active window so the full horizon fits.
+  const weeksVisible = useMemo(() => {
+    if (planningWindow) {
+      return weeksForWindow(
+        planningWindow.start_date,
+        planningWindow.end_date,
+        MIN_WEEKS_VISIBLE
+      );
+    }
+    return MIN_WEEKS_VISIBLE;
+  }, [planningWindow?.start_date, planningWindow?.end_date]);
+
+  const days = useMemo(
+    () =>
+      buildDays(
+        viewStart,
+        weeksVisible,
+        planningWindow?.start_date ?? null,
+        planningWindow?.end_date ?? null
+      ),
+    [viewStart, weeksVisible, planningWindow?.start_date, planningWindow?.end_date]
+  );
 
   // Map date string -> column index (for positioning blocks)
   const dateIndex = useMemo(() => {
@@ -148,16 +216,25 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
     setViewStart(getMonday(new Date()));
   }, []);
 
-  // Scroll to today on mount
-  useEffect(() => {
-    if (todayColRef.current && scrollRef.current) {
-      const container = scrollRef.current;
-      const todayEl = todayColRef.current;
-      const scrollLeft =
-        todayEl.offsetLeft - container.clientWidth / 2 + DAY_COL_WIDTH / 2;
-      container.scrollLeft = Math.max(0, scrollLeft);
+  const goWindowStart = useCallback(() => {
+    if (planningWindow) {
+      setViewStart(
+        getMonday(new Date(planningWindow.start_date + "T00:00:00"))
+      );
     }
-  }, [viewStart]);
+  }, [planningWindow?.start_date]);
+
+  // Scroll behaviour: prefer "today" if it's visible in the rendered range;
+  // otherwise scroll to the start of the window.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const target = todayColRef.current ?? windowStartColRef.current;
+    if (!target) return;
+    const scrollLeft =
+      target.offsetLeft - container.clientWidth / 2 + DAY_COL_WIDTH / 2;
+    container.scrollLeft = Math.max(0, scrollLeft);
+  }, [viewStart, weeksVisible]);
 
   const totalGridWidth = days.length * DAY_COL_WIDTH;
 
@@ -194,6 +271,14 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
         >
           Hoje
         </button>
+        {planningWindow && (
+          <button
+            onClick={goWindowStart}
+            className="px-4 py-2 text-sm font-medium bg-white border border-[var(--color-brand-300)] text-[var(--color-brand-700)] rounded-xl hover:bg-[var(--color-brand-50)] transition-all duration-150 min-h-[44px]"
+          >
+            Ir para janela
+          </button>
+        )}
         <button
           onClick={() => shiftWeeks(1)}
           className="px-3.5 py-2 text-sm font-medium bg-[var(--color-surface-card)] border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-150 min-h-[44px] min-w-[44px] shadow-[var(--shadow-xs)]"
@@ -250,18 +335,7 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                 <div
                   key={wh.startIdx}
                   className="text-[11px] font-semibold text-zinc-500 flex items-center justify-center border-r border-zinc-100"
-                  style={{
-                    width: wh.span * DAY_COL_WIDTH,
-                    marginLeft:
-                      wh.startIdx === 0
-                        ? 0
-                        : undefined,
-                    position: "relative",
-                    left:
-                      wh.startIdx > 0 && weekHeaders[0].startIdx !== wh.startIdx
-                        ? undefined
-                        : undefined,
-                  }}
+                  style={{ width: wh.span * DAY_COL_WIDTH }}
                 >
                   {wh.label}
                 </div>
@@ -273,22 +347,36 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
               className="flex border-b border-zinc-300"
               style={{ height: DAY_HEADER_HEIGHT }}
             >
-              {days.map((day, i) => (
-                <div
-                  key={day.date}
-                  ref={day.isToday ? todayColRef : undefined}
-                  className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
-                    day.isToday
-                      ? "bg-[var(--color-brand-50)] text-[var(--color-brand-700)] font-bold"
-                      : day.isWeekend
-                        ? "bg-zinc-50 text-zinc-400"
-                        : "text-zinc-600"
-                  }`}
-                  style={{ width: DAY_COL_WIDTH }}
-                >
-                  {day.label}
-                </div>
-              ))}
+              {days.map((day) => {
+                const isWindowStart =
+                  planningWindow !== null &&
+                  day.date === planningWindow.start_date;
+                return (
+                  <div
+                    key={day.date}
+                    ref={
+                      day.isToday
+                        ? todayColRef
+                        : isWindowStart
+                          ? windowStartColRef
+                          : undefined
+                    }
+                    className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
+                      day.isToday
+                        ? "bg-[var(--color-brand-50)] text-[var(--color-brand-700)] font-bold"
+                        : !day.isInWindow
+                          ? "bg-zinc-100 text-zinc-400"
+                          : day.isWeekend
+                            ? "bg-zinc-50 text-zinc-400"
+                            : "text-zinc-600"
+                    }`}
+                    style={{ width: DAY_COL_WIDTH }}
+                    title={!day.isInWindow ? "Fora da janela de planeamento" : undefined}
+                  >
+                    {day.label}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Robot lanes */}
@@ -308,9 +396,11 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                         className={`border-r border-zinc-50 ${
                           day.isToday
                             ? "bg-blue-50/40"
-                            : day.isWeekend
-                              ? "bg-zinc-50/60"
-                              : ""
+                            : !day.isInWindow
+                              ? "bg-zinc-100/70"
+                              : day.isWeekend
+                                ? "bg-zinc-50/60"
+                                : ""
                         }`}
                         style={{ width: DAY_COL_WIDTH }}
                       />
@@ -332,11 +422,18 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                     const color = project?.color ?? "#6B7280";
                     const isAM = piece.scheduled_period === "AM";
                     const isInProduction = piece.status === "in_production";
+                    const dayMeta = days[colIdx];
+                    const outsideWindow =
+                      planningWindow !== null && !dayMeta.isInWindow;
 
                     const left = colIdx * DAY_COL_WIDTH + 2;
                     const top = isAM ? 2 : HALF_HEIGHT + 2;
                     const blockWidth = DAY_COL_WIDTH - 4;
                     const blockHeight = HALF_HEIGHT - 4;
+
+                    const outsideClass = outsideWindow
+                      ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
+                      : "";
 
                     return (
                       <button
@@ -344,7 +441,10 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                         onClick={() =>
                           router.push(`/projects/${piece.project_id}`)
                         }
-                        className="absolute rounded-lg text-left cursor-pointer transition-all duration-150 hover:shadow-[var(--shadow-md)] hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-400)] focus:ring-offset-1"
+                        className={
+                          "absolute rounded-lg text-left cursor-pointer transition-all duration-150 hover:shadow-[var(--shadow-md)] hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-400)] focus:ring-offset-1" +
+                          outsideClass
+                        }
                         style={{
                           left,
                           top,
@@ -353,7 +453,10 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                           backgroundColor: color,
                           opacity: isInProduction ? 1 : 0.85,
                         }}
-                        title={`${piece.reference} — ${project?.name ?? "?"}\n${piece.description ?? ""}\n${piece.scheduled_period}`}
+                        title={
+                          `${piece.reference} — ${project?.name ?? "?"}\n${piece.description ?? ""}\n${piece.scheduled_period}` +
+                          (outsideWindow ? "\n⚠ Fora da janela de planeamento activa" : "")
+                        }
                       >
                         <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
                           <span className="text-[11px] font-semibold text-white truncate leading-tight">
@@ -365,6 +468,11 @@ export function GanttChart({ pieces, robots, projectMap }: GanttChartProps) {
                         </div>
                         {isInProduction && (
                           <div className="absolute top-0.5 right-1 w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        )}
+                        {outsideWindow && (
+                          <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/80 rounded px-1 leading-tight pointer-events-none">
+                            fora
+                          </div>
                         )}
                       </button>
                     );
