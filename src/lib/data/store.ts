@@ -6,6 +6,18 @@
 import type { Project, Piece, Robot } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
+/**
+ * Thrown when a write violates the `piece_no_robot_overlap` exclusion
+ * constraint (Postgres SQLSTATE 23P01). Callers should catch this and
+ * map to a user-facing message rather than re-throwing.
+ */
+export class PieceOverlapError extends Error {
+  constructor(message = "Piece range overlaps with another on the same robot.") {
+    super(message);
+    this.name = "PieceOverlapError";
+  }
+}
+
 // --- Project queries ---
 
 export async function getProjects(includeArchived = false): Promise<Project[]> {
@@ -132,7 +144,10 @@ export async function createPiece(
     .insert(data)
     .select()
     .single();
-  if (error) throw new Error(`createPiece: ${error.message}`);
+  if (error) {
+    if (error.code === "23P01") throw new PieceOverlapError();
+    throw new Error(`createPiece: ${error.message}`);
+  }
   return piece;
 }
 
@@ -149,6 +164,8 @@ export async function updatePiece(
     .single();
   if (error) {
     if (error.code === "PGRST116") return null;
+    // 23P01 = exclusion_violation (piece_no_robot_overlap constraint)
+    if (error.code === "23P01") throw new PieceOverlapError();
     throw new Error(`updatePiece: ${error.message}`);
   }
   return piece;

@@ -14,8 +14,12 @@ import {
   unlinkProgram as dbUnlinkProgram,
   allocatePiece as dbAllocatePiece,
   deallocatePiece as dbDeallocatePiece,
+  PieceOverlapError,
 } from "@/lib/data/store";
 import type { PieceStatus } from "@/lib/types";
+
+const PIECE_OVERLAP_MESSAGE =
+  "Esta peça sobrepõe-se a outra já planeada no mesmo robot.";
 
 export type ActionResult = {
   success: boolean;
@@ -75,26 +79,33 @@ export async function createPieceAction(
     };
   }
 
-  await dbCreatePiece({
-    project_id: result.data.project_id,
-    reference: result.data.reference,
-    description: result.data.description ?? null,
-    material: result.data.material ?? null,
-    wps: result.data.wps ?? null,
-    quantity: result.data.quantity,
-    weight_kg: result.data.weight_kg ?? null,
-    estimated_hours: result.data.estimated_hours ?? null,
-    status: result.data.status,
-    robot_id: null,
-    scheduled_date: null,
-    scheduled_period: null,
-    planned_start_date: result.data.planned_start_date ?? null,
-    planned_end_date: result.data.planned_end_date ?? null,
-    urgent: result.data.urgent,
-    barcode: result.data.barcode ?? null,
-    program_id: null,
-    position: null,
-  });
+  try {
+    await dbCreatePiece({
+      project_id: result.data.project_id,
+      reference: result.data.reference,
+      description: result.data.description ?? null,
+      material: result.data.material ?? null,
+      wps: result.data.wps ?? null,
+      quantity: result.data.quantity,
+      weight_kg: result.data.weight_kg ?? null,
+      estimated_hours: result.data.estimated_hours ?? null,
+      status: result.data.status,
+      robot_id: null,
+      scheduled_date: null,
+      scheduled_period: null,
+      planned_start_date: result.data.planned_start_date ?? null,
+      planned_end_date: result.data.planned_end_date ?? null,
+      urgent: result.data.urgent,
+      barcode: result.data.barcode ?? null,
+      program_id: null,
+      position: null,
+    });
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
 
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
@@ -153,19 +164,26 @@ export async function updatePieceAction(
     }
   }
 
-  await dbUpdatePiece(id, {
-    ...(result.data.reference !== undefined && { reference: result.data.reference }),
-    description: result.data.description ?? null,
-    material: result.data.material ?? null,
-    wps: result.data.wps ?? null,
-    ...(result.data.quantity !== undefined && { quantity: result.data.quantity }),
-    weight_kg: result.data.weight_kg ?? null,
-    estimated_hours: result.data.estimated_hours ?? null,
-    planned_start_date: result.data.planned_start_date ?? null,
-    planned_end_date: result.data.planned_end_date ?? null,
-    urgent: result.data.urgent ?? piece.urgent,
-    barcode: result.data.barcode ?? null,
-  });
+  try {
+    await dbUpdatePiece(id, {
+      ...(result.data.reference !== undefined && { reference: result.data.reference }),
+      description: result.data.description ?? null,
+      material: result.data.material ?? null,
+      wps: result.data.wps ?? null,
+      ...(result.data.quantity !== undefined && { quantity: result.data.quantity }),
+      weight_kg: result.data.weight_kg ?? null,
+      estimated_hours: result.data.estimated_hours ?? null,
+      planned_start_date: result.data.planned_start_date ?? null,
+      planned_end_date: result.data.planned_end_date ?? null,
+      urgent: result.data.urgent ?? piece.urgent,
+      barcode: result.data.barcode ?? null,
+    });
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
 
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
@@ -188,7 +206,15 @@ export async function movePieceAction(
     return { success: false, error: "Estado invalido." };
   }
 
-  const piece = await dbMovePiece(pieceId, newStatus);
+  let piece;
+  try {
+    piece = await dbMovePiece(pieceId, newStatus);
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
@@ -268,7 +294,15 @@ export async function allocatePieceAction(
 
   const { pieceId, robotId, date, period } = result.data;
 
-  const piece = await dbAllocatePiece(pieceId, robotId, date, period);
+  let piece;
+  try {
+    piece = await dbAllocatePiece(pieceId, robotId, date, period);
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
@@ -297,12 +331,20 @@ export async function allocatePieceDirectAction(
     return { success: false, fieldErrors };
   }
 
-  const piece = await dbAllocatePiece(
-    result.data.pieceId,
-    result.data.robotId,
-    result.data.date,
-    result.data.period
-  );
+  let piece;
+  try {
+    piece = await dbAllocatePiece(
+      result.data.pieceId,
+      result.data.robotId,
+      result.data.date,
+      result.data.period
+    );
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/calendar");
@@ -374,7 +416,15 @@ export async function movePlannedRangeAction(input: {
     patch.robot_id = result.data.robotId;
   }
 
-  const piece = await dbUpdatePiece(result.data.pieceId, patch);
+  let piece;
+  try {
+    piece = await dbUpdatePiece(result.data.pieceId, patch);
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
