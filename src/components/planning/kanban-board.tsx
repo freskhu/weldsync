@@ -26,9 +26,6 @@ import { AllocationModal } from "./allocation-modal";
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
   { id: "programmed", label: "Programada" },
-  { id: "allocated", label: "Alocada" },
-  { id: "in_production", label: "Em Produção" },
-  { id: "completed", label: "Concluída" },
 ];
 
 interface KanbanBoardProps {

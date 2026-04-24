@@ -32,7 +32,7 @@ export default async function PlanningPage() {
 
   return (
     <div className="p-4 md:p-6 h-screen flex flex-col">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-4">Planeamento</h1>
+      <h1 className="text-2xl font-bold text-zinc-900 mb-4">Programação</h1>
       <div className="mb-4 flex-shrink-0">
         <PlanningWindowBar window={planningWindow} />
       </div>

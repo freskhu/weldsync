@@ -61,7 +61,7 @@ function IconRobots({ active }: { active: boolean }) {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, activeColor: "rgba(0, 115, 234, 0.18)" },
   { href: "/projects", label: "Projetos", Icon: IconProjects, activeColor: "rgba(0, 115, 234, 0.18)" },
-  { href: "/planning", label: "Planeamento", Icon: IconPlanning, activeColor: "rgba(0, 115, 234, 0.18)" },
+  { href: "/planning", label: "Programação", Icon: IconPlanning, activeColor: "rgba(0, 115, 234, 0.18)" },
   { href: "/calendar", label: "Calendário", Icon: IconCalendar, activeColor: "rgba(0, 115, 234, 0.18)" },
   { href: "/programs", label: "Programas", Icon: IconPrograms, activeColor: "rgba(0, 115, 234, 0.18)" },
   { href: "/robots", label: "Robots", Icon: IconRobots, activeColor: "rgba(0, 115, 234, 0.18)" },
