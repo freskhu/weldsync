@@ -254,6 +254,63 @@ function DraggablePieceBlock({
 }
 
 // ---------------------------------------------------------------------------
+// Resize Handle — thin draggable strip on the left or right edge of a range
+// block. Uses its own useDraggable ID prefixed with `resize-start-` or
+// `resize-end-` so handleDragEnd can discriminate from the full-block move.
+// ---------------------------------------------------------------------------
+
+function ResizeHandle({
+  pieceId,
+  edge,
+  height,
+}: {
+  pieceId: string;
+  edge: "start" | "end";
+  height: number;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: `resize-${edge}-${pieceId}`,
+      data: { pieceId, kind: "resize", edge },
+    });
+
+  // The handle visually translates with the drag so the user sees feedback,
+  // but layout/width of the underlying block is only updated on drop. Without
+  // this the handle appears "stuck" to the block edge while the pointer moves.
+  const style: React.CSSProperties = {
+    width: 8,
+    height,
+    top: 0,
+    [edge === "start" ? "left" : "right"]: -4,
+    cursor: "ew-resize",
+    touchAction: "none",
+    zIndex: 45,
+    ...(transform ? { transform: `translate(${transform.x}px, 0)` } : {}),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={style}
+      className={`absolute group/handle flex items-center justify-center ${
+        isDragging ? "opacity-100" : "opacity-0 hover:opacity-100"
+      }`}
+      role="slider"
+      aria-label={
+        edge === "start"
+          ? "Arrastar para alterar data de inicio"
+          : "Arrastar para alterar data de fim"
+      }
+    >
+      {/* Visible grip: narrow vertical bar, subtle until hover. */}
+      <div className="w-1 h-[60%] rounded-full bg-white/90 shadow" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Draggable Range (Span) Block — planned_start_date → planned_end_date
 // ---------------------------------------------------------------------------
 
@@ -313,7 +370,7 @@ function DraggableRangeBlock({
       {...attributes}
       className={baseClass + outsideClass}
       style={style}
-      title={`${piece.reference} — ${projectName}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}\nArrasta para mover. Clica X para remover.`}
+      title={`${piece.reference} — ${projectName}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}\nArrasta o bloco para mover. Arrasta as bordas para ajustar datas. Clica X para remover.`}
     >
       <div className="px-2 py-1 h-full flex flex-col justify-center overflow-hidden pointer-events-none">
         <span className="text-[11px] font-semibold text-white truncate leading-tight drop-shadow">
@@ -323,7 +380,12 @@ function DraggableRangeBlock({
           {projectName}
         </span>
       </div>
-      {/* Delete button — visible on hover, always tappable on touch */}
+      {/* Resize handles on both edges. Siblings of the body span, so they
+          receive pointer events even though the body text is pointer-events-none. */}
+      <ResizeHandle pieceId={piece.id} edge="start" height={height} />
+      <ResizeHandle pieceId={piece.id} edge="end" height={height} />
+      {/* Delete button — visible on hover, always tappable on touch.
+          Rendered AFTER the handles so it stacks on top in the top-right corner. */}
       <button
         type="button"
         onPointerDown={(e) => {
@@ -335,7 +397,7 @@ function DraggableRangeBlock({
           e.preventDefault();
           onDelete(piece.id);
         }}
-        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-[46]"
         aria-label={`Remover ${piece.reference} do calendario`}
         title="Remover do calendario"
       >
@@ -608,6 +670,79 @@ export function GanttDndChart({
       const { active, over, delta } = event;
 
       const activeIdStr = active.id as string;
+
+      // ---- Resize handle drag: shift only one endpoint ----
+      if (
+        activeIdStr.startsWith("resize-start-") ||
+        activeIdStr.startsWith("resize-end-")
+      ) {
+        const edge: "start" | "end" = activeIdStr.startsWith("resize-start-")
+          ? "start"
+          : "end";
+        const pieceId = activeIdStr.slice(
+          edge === "start" ? "resize-start-".length : "resize-end-".length
+        );
+        const piece = pieces.find((p) => p.id === pieceId);
+        if (
+          !piece ||
+          !piece.planned_start_date ||
+          !piece.planned_end_date
+        ) {
+          return;
+        }
+
+        const dayDelta = Math.round(delta.x / DAY_COL_WIDTH);
+        if (dayDelta === 0) return;
+
+        let newStart = piece.planned_start_date;
+        let newEnd = piece.planned_end_date;
+
+        if (edge === "start") {
+          const candidate = addDaysISO(piece.planned_start_date, dayDelta);
+          // Client-side clamp: start cannot cross end (min 1-day duration).
+          newStart = candidate > piece.planned_end_date
+            ? piece.planned_end_date
+            : candidate;
+          if (newStart === piece.planned_start_date) return;
+        } else {
+          const candidate = addDaysISO(piece.planned_end_date, dayDelta);
+          // Client-side clamp: end cannot cross start (min 1-day duration).
+          newEnd = candidate < piece.planned_start_date
+            ? piece.planned_start_date
+            : candidate;
+          if (newEnd === piece.planned_end_date) return;
+        }
+
+        const previousPieces = [...pieces];
+        setPieces((prev) =>
+          prev.map((p) =>
+            p.id === pieceId
+              ? {
+                  ...p,
+                  planned_start_date: newStart,
+                  planned_end_date: newEnd,
+                }
+              : p
+          )
+        );
+
+        const result = await movePlannedRangeAction({
+          pieceId,
+          newStart,
+          newEnd,
+          // Robot unchanged on resize.
+          robotId: piece.robot_id,
+        });
+
+        if (!result.success) {
+          setPieces(previousPieces);
+          setToast({
+            message: result.error ?? "Erro ao redimensionar bloco planeado.",
+            type: "error",
+          });
+        }
+        return;
+      }
 
       // ---- Range (span) block drag: no droppable required ----
       if (activeIdStr.startsWith("range-")) {
