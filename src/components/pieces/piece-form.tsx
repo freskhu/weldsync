@@ -198,6 +198,40 @@ export function PieceForm({ action, projectId, piece, clientRef, onCancel, onSuc
           />
         </div>
 
+        {/* Planned start date */}
+        <div>
+          <label htmlFor="planned_start_date" className="block text-sm font-medium text-gray-700 mb-1">
+            Início planeado
+          </label>
+          <input
+            id="planned_start_date"
+            name="planned_start_date"
+            type="date"
+            defaultValue={piece?.planned_start_date ?? ""}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
+          />
+          {state?.fieldErrors?.planned_start_date && (
+            <p className="mt-1 text-sm text-red-600">{state.fieldErrors.planned_start_date[0]}</p>
+          )}
+        </div>
+
+        {/* Planned end date */}
+        <div>
+          <label htmlFor="planned_end_date" className="block text-sm font-medium text-gray-700 mb-1">
+            Fim planeado
+          </label>
+          <input
+            id="planned_end_date"
+            name="planned_end_date"
+            type="date"
+            defaultValue={piece?.planned_end_date ?? ""}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 min-h-[44px]"
+          />
+          {state?.fieldErrors?.planned_end_date && (
+            <p className="mt-1 text-sm text-red-600">{state.fieldErrors.planned_end_date[0]}</p>
+          )}
+        </div>
+
         {/* Urgent Toggle */}
         <div className="flex items-center gap-3 min-h-[44px]">
           <label htmlFor="urgent" className="relative inline-flex items-center cursor-pointer">

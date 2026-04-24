@@ -412,6 +412,30 @@ export function GanttDndChart({
     return map;
   }, [scheduledPieces, robots]);
 
+  // Pieces with both planned_start_date + planned_end_date defined and
+  // assigned to a robot render as a read-only span block under the AM/PM
+  // slotted blocks. No robot_id -> no lane to render on, so skip.
+  const plannedRangePieces = useMemo(
+    () =>
+      pieces.filter(
+        (p) =>
+          p.robot_id !== null &&
+          p.planned_start_date !== null &&
+          p.planned_end_date !== null
+      ),
+    [pieces]
+  );
+
+  const rangePiecesByRobot = useMemo(() => {
+    const map = new Map<number, Piece[]>();
+    for (const r of robots) map.set(r.id, []);
+    for (const p of plannedRangePieces) {
+      const list = map.get(p.robot_id!);
+      if (list) list.push(p);
+    }
+    return map;
+  }, [plannedRangePieces, robots]);
+
   // Sensors
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: { distance: 8 },
@@ -703,6 +727,7 @@ export function GanttDndChart({
               {/* Robot lanes */}
               {robots.map((robot) => {
                 const robotPieces = piecesByRobot.get(robot.id) ?? [];
+                const rangePieces = rangePiecesByRobot.get(robot.id) ?? [];
                 return (
                   <div
                     key={robot.id}
@@ -746,6 +771,61 @@ export function GanttDndChart({
                         </div>
                       ))}
                     </div>
+
+                    {/* Planned-range span blocks (read-only, non-interactive).
+                        Rendered under the AM/PM slot blocks so drag targets
+                        remain unobstructed. Uses full lane height. */}
+                    {rangePieces.map((piece) => {
+                      const startIdx = dateIndex.get(piece.planned_start_date!);
+                      const endIdx = dateIndex.get(piece.planned_end_date!);
+                      // If neither endpoint is in the visible range, skip.
+                      if (startIdx === undefined && endIdx === undefined) return null;
+                      // Clamp to the visible range so partial-visible spans
+                      // still render as a bar from the visible edge.
+                      const clampedStart =
+                        startIdx ?? 0;
+                      const clampedEnd =
+                        endIdx ?? days.length - 1;
+                      if (clampedEnd < 0 || clampedStart > days.length - 1) return null;
+                      const firstVisible = Math.max(0, clampedStart);
+                      const lastVisible = Math.min(days.length - 1, clampedEnd);
+                      if (lastVisible < firstVisible) return null;
+
+                      const project = projectMap[piece.project_id];
+                      const color = project?.color ?? "#6B7280";
+                      const left = firstVisible * DAY_COL_WIDTH + 2;
+                      const width =
+                        (lastVisible - firstVisible + 1) * DAY_COL_WIDTH - 4;
+                      // Check if any day of the planned range is outside the
+                      // active planning window (same treatment as scheduled
+                      // blocks: amber ring + "fora" badge).
+                      const outsideWindow =
+                        planningWindow !== null &&
+                        (piece.planned_start_date! < planningWindow.start_date ||
+                          piece.planned_end_date! > planningWindow.end_date);
+
+                      return (
+                        <div
+                          key={`range-${piece.id}`}
+                          className={
+                            "absolute rounded-md pointer-events-none select-none border border-white/20" +
+                            (outsideWindow
+                              ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
+                              : "")
+                          }
+                          style={{
+                            left,
+                            top: 2,
+                            width,
+                            height: LANE_HEIGHT - 4,
+                            backgroundColor: color,
+                            opacity: 0.25,
+                            zIndex: 0,
+                          }}
+                          title={`${piece.reference} — ${project?.name ?? ""}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}`}
+                        />
+                      );
+                    })}
 
                     {/* AM/PM separator line */}
                     <div

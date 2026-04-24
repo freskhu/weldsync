@@ -94,6 +94,40 @@ export function ProjectForm({ action, project, onCancel }: ProjectFormProps) {
             className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
           />
         </div>
+
+        {/* Project start date */}
+        <div>
+          <label htmlFor="start_date" className="block text-sm font-medium text-zinc-700 mb-1">
+            Início do projeto
+          </label>
+          <input
+            id="start_date"
+            name="start_date"
+            type="date"
+            defaultValue={project?.start_date ?? ""}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
+          />
+          {state?.fieldErrors?.start_date && (
+            <p className="mt-1 text-sm text-red-600">{state.fieldErrors.start_date[0]}</p>
+          )}
+        </div>
+
+        {/* Project end date */}
+        <div>
+          <label htmlFor="end_date" className="block text-sm font-medium text-zinc-700 mb-1">
+            Fim do projeto
+          </label>
+          <input
+            id="end_date"
+            name="end_date"
+            type="date"
+            defaultValue={project?.end_date ?? ""}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/30 focus:border-[var(--color-brand-400)] min-h-[44px]"
+          />
+          {state?.fieldErrors?.end_date && (
+            <p className="mt-1 text-sm text-red-600">{state.fieldErrors.end_date[0]}</p>
+          )}
+        </div>
       </div>
 
       {/* Color */}
