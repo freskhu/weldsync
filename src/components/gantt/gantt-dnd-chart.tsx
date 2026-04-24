@@ -8,7 +8,6 @@ import {
   useCallback,
   useId,
 } from "react";
-import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -23,7 +22,11 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import type { Piece, PlanningWindow, Robot } from "@/lib/types";
-import { allocatePieceDirectAction } from "@/app/actions/piece-actions";
+import {
+  allocatePieceDirectAction,
+  movePlannedRangeAction,
+  clearPlannedRangeAction,
+} from "@/app/actions/piece-actions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +75,10 @@ function addDays(d: Date, n: number): Date {
   const copy = new Date(d);
   copy.setDate(copy.getDate() + n);
   return copy;
+}
+
+function addDaysISO(iso: string, n: number): string {
+  return formatDateISO(addDays(new Date(iso + "T00:00:00"), n));
 }
 
 function isoWeek(d: Date): number {
@@ -247,6 +254,103 @@ function DraggablePieceBlock({
 }
 
 // ---------------------------------------------------------------------------
+// Draggable Range (Span) Block — planned_start_date → planned_end_date
+// ---------------------------------------------------------------------------
+
+function DraggableRangeBlock({
+  piece,
+  color,
+  projectName,
+  left,
+  top,
+  width,
+  height,
+  outsideWindow,
+  onDelete,
+}: {
+  piece: Piece;
+  color: string;
+  projectName: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  outsideWindow: boolean;
+  onDelete: (pieceId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: `range-${piece.id}`,
+      data: { piece, kind: "range" },
+    });
+
+  const style: React.CSSProperties = {
+    left,
+    top,
+    width,
+    height,
+    backgroundColor: color,
+    opacity: isDragging ? 0.25 : 0.35,
+    ...(transform
+      ? {
+          transform: `translate(${transform.x}px, ${transform.y}px)`,
+          zIndex: 40,
+          opacity: 0.6,
+        }
+      : {}),
+  };
+
+  const baseClass =
+    "absolute rounded-md cursor-grab active:cursor-grabbing select-none touch-manipulation border border-white/30 group hover:brightness-95 hover:opacity-60";
+  const outsideClass = outsideWindow
+    ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
+    : "";
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={baseClass + outsideClass}
+      style={style}
+      title={`${piece.reference} — ${projectName}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}\nArrasta para mover. Clica X para remover.`}
+    >
+      <div className="px-2 py-1 h-full flex flex-col justify-center overflow-hidden pointer-events-none">
+        <span className="text-[11px] font-semibold text-white truncate leading-tight drop-shadow">
+          {piece.reference}
+        </span>
+        <span className="text-[9px] text-white/90 truncate leading-tight">
+          {projectName}
+        </span>
+      </div>
+      {/* Delete button — visible on hover, always tappable on touch */}
+      <button
+        type="button"
+        onPointerDown={(e) => {
+          // Prevent dnd-kit from starting a drag when the delete button is pressed.
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onDelete(piece.id);
+        }}
+        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        aria-label={`Remover ${piece.reference} do calendario`}
+        title="Remover do calendario"
+      >
+        ×
+      </button>
+      {outsideWindow && (
+        <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/80 rounded px-1 leading-tight pointer-events-none">
+          fora
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Overlay Block (follows cursor during drag)
 // ---------------------------------------------------------------------------
 
@@ -328,7 +432,6 @@ export function GanttDndChart({
   projectMap,
   planningWindow,
 }: GanttDndChartProps) {
-  const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const todayColRef = useRef<HTMLDivElement>(null);
   const windowStartColRef = useRef<HTMLDivElement>(null);
@@ -502,10 +605,82 @@ export function GanttDndChart({
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       setActiveId(null);
-      const { active, over } = event;
+      const { active, over, delta } = event;
+
+      const activeIdStr = active.id as string;
+
+      // ---- Range (span) block drag: no droppable required ----
+      if (activeIdStr.startsWith("range-")) {
+        const pieceId = activeIdStr.slice("range-".length);
+        const piece = pieces.find((p) => p.id === pieceId);
+        if (
+          !piece ||
+          !piece.planned_start_date ||
+          !piece.planned_end_date
+        ) {
+          return;
+        }
+
+        // Snap to day grid via horizontal delta. Snap to lane (robot) via
+        // vertical delta.
+        const dayDelta = Math.round(delta.x / DAY_COL_WIDTH);
+        const laneDelta = Math.round(delta.y / LANE_HEIGHT);
+
+        // No-op drag: zero movement in both axes.
+        if (dayDelta === 0 && laneDelta === 0) return;
+
+        const newStart = addDaysISO(piece.planned_start_date, dayDelta);
+        const newEnd = addDaysISO(piece.planned_end_date, dayDelta);
+
+        // Resolve target robot. If lane moved, pick the robot at the new lane.
+        let newRobotId: number | null = piece.robot_id;
+        if (laneDelta !== 0 && piece.robot_id !== null) {
+          const currentIdx = robots.findIndex((r) => r.id === piece.robot_id);
+          if (currentIdx !== -1) {
+            const newIdx = Math.max(
+              0,
+              Math.min(robots.length - 1, currentIdx + laneDelta)
+            );
+            newRobotId = robots[newIdx].id;
+          }
+        }
+
+        // Optimistic update
+        const previousPieces = [...pieces];
+        setPieces((prev) =>
+          prev.map((p) =>
+            p.id === pieceId
+              ? {
+                  ...p,
+                  planned_start_date: newStart,
+                  planned_end_date: newEnd,
+                  robot_id: newRobotId,
+                }
+              : p
+          )
+        );
+
+        const result = await movePlannedRangeAction({
+          pieceId,
+          newStart,
+          newEnd,
+          robotId: newRobotId,
+        });
+
+        if (!result.success) {
+          setPieces(previousPieces);
+          setToast({
+            message: result.error ?? "Erro ao mover bloco planeado.",
+            type: "error",
+          });
+        }
+        return;
+      }
+
+      // ---- Slot (AM/PM) block drag: requires droppable target ----
       if (!over) return;
 
-      const pieceId = active.id as string;
+      const pieceId = activeIdStr;
       const target = parseDropId(over.id as string);
       if (!target) return;
 
@@ -572,6 +747,35 @@ export function GanttDndChart({
   const handleDragCancel = useCallback(() => {
     setActiveId(null);
   }, []);
+
+  const handleDeleteRange = useCallback(
+    async (pieceId: string) => {
+      const previousPieces = [...pieces];
+      // Optimistic: clear planned range locally so the block disappears.
+      setPieces((prev) =>
+        prev.map((p) =>
+          p.id === pieceId
+            ? {
+                ...p,
+                planned_start_date: null,
+                planned_end_date: null,
+              }
+            : p
+        )
+      );
+
+      const result = await clearPlannedRangeAction(pieceId);
+      if (!result.success) {
+        setPieces(previousPieces);
+        setToast({
+          message: result.error ?? "Erro ao remover bloco planeado.",
+          type: "error",
+        });
+      }
+      // Server revalidatePath will refresh props; router.refresh not needed.
+    },
+    [pieces]
+  );
 
   const totalGridWidth = days.length * DAY_COL_WIDTH;
 
@@ -805,24 +1009,17 @@ export function GanttDndChart({
                           piece.planned_end_date! > planningWindow.end_date);
 
                       return (
-                        <div
+                        <DraggableRangeBlock
                           key={`range-${piece.id}`}
-                          className={
-                            "absolute rounded-md pointer-events-none select-none border border-white/20" +
-                            (outsideWindow
-                              ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
-                              : "")
-                          }
-                          style={{
-                            left,
-                            top: 2,
-                            width,
-                            height: LANE_HEIGHT - 4,
-                            backgroundColor: color,
-                            opacity: 0.25,
-                            zIndex: 0,
-                          }}
-                          title={`${piece.reference} — ${project?.name ?? ""}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}`}
+                          piece={piece}
+                          color={color}
+                          projectName={project?.name ?? ""}
+                          left={left}
+                          top={2}
+                          width={width}
+                          height={LANE_HEIGHT - 4}
+                          outsideWindow={outsideWindow}
+                          onDelete={handleDeleteRange}
                         />
                       );
                     })}

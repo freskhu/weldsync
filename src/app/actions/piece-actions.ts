@@ -324,3 +324,84 @@ export async function deallocatePieceAction(
   revalidatePath("/robots");
   return { success: true };
 }
+
+// --- Planned range (span block) actions ---
+
+const movePlannedRangeSchema = z
+  .object({
+    pieceId: z.string().min(1, "ID da peca em falta."),
+    newStart: z.string().date(),
+    newEnd: z.string().date(),
+    robotId: z.number().int().positive().nullable().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.newEnd < val.newStart) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["newEnd"],
+        message: "Data de fim deve ser igual ou posterior a data de inicio.",
+      });
+    }
+  });
+
+/**
+ * Shifts a piece's planned date range (and optionally reassigns robot).
+ * Both dates are required together; end must be >= start.
+ * Used by drag-to-move on the Gantt span blocks.
+ */
+export async function movePlannedRangeAction(input: {
+  pieceId: string;
+  newStart: string;
+  newEnd: string;
+  robotId?: number | null;
+}): Promise<ActionResult> {
+  const result = movePlannedRangeSchema.safeParse(input);
+  if (!result.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of result.error.issues) {
+      const key = issue.path[0]?.toString() ?? "_root";
+      if (!fieldErrors[key]) fieldErrors[key] = [];
+      fieldErrors[key].push(issue.message);
+    }
+    return { success: false, fieldErrors };
+  }
+
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    planned_start_date: result.data.newStart,
+    planned_end_date: result.data.newEnd,
+  };
+  if (result.data.robotId !== undefined && result.data.robotId !== null) {
+    patch.robot_id = result.data.robotId;
+  }
+
+  const piece = await dbUpdatePiece(result.data.pieceId, patch);
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
+/**
+ * Clears a piece's planned date range (removes it from the calendar).
+ * Leaves scheduled_date / robot_id untouched — this only clears the span block.
+ */
+export async function clearPlannedRangeAction(
+  pieceId: string
+): Promise<ActionResult> {
+  if (!pieceId || typeof pieceId !== "string") {
+    return { success: false, error: "ID da peca em falta." };
+  }
+
+  const piece = await dbUpdatePiece(pieceId, {
+    planned_start_date: null,
+    planned_end_date: null,
+  });
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
+  return { success: true };
+}
