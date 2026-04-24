@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { pieceCreateSchema, pieceUpdateSchema } from "@/lib/validations/piece";
+import {
+  pieceCreateSchema,
+  pieceUpdateSchema,
+  withPlannedPeriodDefaults,
+} from "@/lib/validations/piece";
 import {
   createPiece as dbCreatePiece,
   updatePiece as dbUpdatePiece,
@@ -33,13 +37,20 @@ function parseNumber(val: string | null): number | null {
   return isNaN(n) ? null : n;
 }
 
+function parsePiecePeriod(
+  val: string | null
+): "morning" | "afternoon" | null {
+  if (val !== "morning" && val !== "afternoon") return null;
+  return val;
+}
+
 export async function createPieceAction(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
   const projectId = formData.get("project_id") as string;
 
-  const raw = {
+  const raw = withPlannedPeriodDefaults({
     project_id: projectId,
     reference: formData.get("reference") as string,
     description: (formData.get("description") as string) || null,
@@ -50,9 +61,15 @@ export async function createPieceAction(
     estimated_hours: parseNumber(formData.get("estimated_hours") as string),
     planned_start_date: (formData.get("planned_start_date") as string) || null,
     planned_end_date: (formData.get("planned_end_date") as string) || null,
+    planned_start_period: parsePiecePeriod(
+      formData.get("planned_start_period") as string | null
+    ),
+    planned_end_period: parsePiecePeriod(
+      formData.get("planned_end_period") as string | null
+    ),
     urgent: formData.get("urgent") === "on",
     barcode: (formData.get("barcode") as string) || null,
-  };
+  });
 
   const result = pieceCreateSchema.safeParse(raw);
 
@@ -95,6 +112,8 @@ export async function createPieceAction(
       scheduled_period: null,
       planned_start_date: result.data.planned_start_date ?? null,
       planned_end_date: result.data.planned_end_date ?? null,
+      planned_start_period: result.data.planned_start_period ?? null,
+      planned_end_period: result.data.planned_end_period ?? null,
       urgent: result.data.urgent,
       barcode: result.data.barcode ?? null,
       program_id: null,
@@ -123,7 +142,7 @@ export async function updatePieceAction(
   const piece = await getPieceById(id);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
-  const raw = {
+  const raw = withPlannedPeriodDefaults({
     reference: formData.get("reference") as string,
     description: (formData.get("description") as string) || null,
     material: (formData.get("material") as string) || null,
@@ -133,9 +152,15 @@ export async function updatePieceAction(
     estimated_hours: parseNumber(formData.get("estimated_hours") as string),
     planned_start_date: (formData.get("planned_start_date") as string) || null,
     planned_end_date: (formData.get("planned_end_date") as string) || null,
+    planned_start_period: parsePiecePeriod(
+      formData.get("planned_start_period") as string | null
+    ),
+    planned_end_period: parsePiecePeriod(
+      formData.get("planned_end_period") as string | null
+    ),
     urgent: formData.get("urgent") === "on",
     barcode: (formData.get("barcode") as string) || null,
-  };
+  });
 
   const result = pieceUpdateSchema.safeParse(raw);
 
@@ -175,6 +200,8 @@ export async function updatePieceAction(
       estimated_hours: result.data.estimated_hours ?? null,
       planned_start_date: result.data.planned_start_date ?? null,
       planned_end_date: result.data.planned_end_date ?? null,
+      planned_start_period: result.data.planned_start_period ?? null,
+      planned_end_period: result.data.planned_end_period ?? null,
       urgent: result.data.urgent ?? piece.urgent,
       barcode: result.data.barcode ?? null,
     });
@@ -374,27 +401,46 @@ const movePlannedRangeSchema = z
     pieceId: z.string().min(1, "ID da peca em falta."),
     newStart: z.string().date(),
     newEnd: z.string().date(),
+    // Half-day granularity. Optional for backwards compat: callers that omit
+    // these get defaulted to morning/afternoon (full-day span) below.
+    newStartPeriod: z.enum(["morning", "afternoon"]).optional(),
+    newEndPeriod: z.enum(["morning", "afternoon"]).optional(),
     robotId: z.number().int().positive().nullable().optional(),
   })
   .superRefine((val, ctx) => {
-    if (val.newEnd < val.newStart) {
+    // Use the same half-day ordinal comparison as the DB CHECK constraint.
+    // Default periods if missing (backwards compat).
+    const sp = val.newStartPeriod ?? "morning";
+    const ep = val.newEndPeriod ?? "afternoon";
+    const t1 = Date.parse(val.newStart + "T00:00:00Z");
+    const t2 = Date.parse(val.newEnd + "T00:00:00Z");
+    const d1 = Math.round(t1 / 86_400_000);
+    const d2 = Math.round(t2 / 86_400_000);
+    const startOrd = d1 * 2 + (sp === "morning" ? 0 : 1);
+    const endOrd = d2 * 2 + (ep === "morning" ? 0 : 1);
+    if (endOrd < startOrd) {
       ctx.addIssue({
         code: "custom",
         path: ["newEnd"],
-        message: "Data de fim deve ser igual ou posterior a data de inicio.",
+        message:
+          "Fim deve ser igual ou posterior ao início (considerando manhã/tarde).",
       });
     }
   });
 
 /**
  * Shifts a piece's planned date range (and optionally reassigns robot).
- * Both dates are required together; end must be >= start.
+ * Both dates are required together; end must be >= start at half-day resolution.
+ * `newStartPeriod` / `newEndPeriod` are optional — omitted calls default to
+ * morning/afternoon (full-day span) to keep existing Gantt drag code working.
  * Used by drag-to-move on the Gantt span blocks.
  */
 export async function movePlannedRangeAction(input: {
   pieceId: string;
   newStart: string;
   newEnd: string;
+  newStartPeriod?: "morning" | "afternoon";
+  newEndPeriod?: "morning" | "afternoon";
   robotId?: number | null;
 }): Promise<ActionResult> {
   const result = movePlannedRangeSchema.safeParse(input);
@@ -411,6 +457,8 @@ export async function movePlannedRangeAction(input: {
   const patch: Parameters<typeof dbUpdatePiece>[1] = {
     planned_start_date: result.data.newStart,
     planned_end_date: result.data.newEnd,
+    planned_start_period: result.data.newStartPeriod ?? "morning",
+    planned_end_period: result.data.newEndPeriod ?? "afternoon",
   };
   if (result.data.robotId !== undefined && result.data.robotId !== null) {
     patch.robot_id = result.data.robotId;
@@ -447,6 +495,8 @@ export async function clearPlannedRangeAction(
   const piece = await dbUpdatePiece(pieceId, {
     planned_start_date: null,
     planned_end_date: null,
+    planned_start_period: null,
+    planned_end_period: null,
   });
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 

@@ -11,6 +11,13 @@ export type PieceStatus =
   | "in_production"
   | "completed";
 export type SchedulePeriod = "AM" | "PM";
+/**
+ * Half-day resolution used by piece planned range
+ * (morning = 08:00-12:00, afternoon = 13:00-17:00).
+ * Distinct from `SchedulePeriod` (AM/PM) which drives scheduled_period cell
+ * allocation.
+ */
+export type PiecePeriod = "morning" | "afternoon";
 export type ProgramFileType = "tp" | "ls";
 
 export interface Robot {
@@ -59,6 +66,10 @@ export interface Piece {
   planned_start_date: string | null;
   /** Planned range end (ISO YYYY-MM-DD). Paired with planned_start_date. */
   planned_end_date: string | null;
+  /** Half-day slot the piece starts in. Paired with planned_start_date. */
+  planned_start_period: PiecePeriod | null;
+  /** Half-day slot the piece ends in. Paired with planned_end_date. */
+  planned_end_period: PiecePeriod | null;
   urgent: boolean;
   barcode: string | null;
   program_id: string | null;
