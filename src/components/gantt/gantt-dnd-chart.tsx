@@ -22,7 +22,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import type { Piece, Robot } from "@/lib/types";
+import type { Piece, PlanningWindow, Robot } from "@/lib/types";
 import { allocatePieceDirectAction } from "@/app/actions/piece-actions";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +33,7 @@ interface GanttDndChartProps {
   pieces: Piece[];
   robots: Robot[];
   projectMap: Record<string, { name: string; color: string }>;
+  planningWindow: PlanningWindow | null;
 }
 
 interface DayColumn {
@@ -41,6 +42,7 @@ interface DayColumn {
   dayOfWeek: number;
   isToday: boolean;
   isWeekend: boolean;
+  isInWindow: boolean;
   weekLabel: string | null;
 }
 
@@ -79,7 +81,12 @@ function isoWeek(d: Date): number {
   return Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-function buildDays(startMonday: Date, weeks: number): DayColumn[] {
+function buildDays(
+  startMonday: Date,
+  weeks: number,
+  windowStart: string | null,
+  windowEnd: string | null
+): DayColumn[] {
   const totalDays = weeks * 7;
   const todayStr = formatDateISO(new Date());
   const days: DayColumn[] = [];
@@ -89,23 +96,45 @@ function buildDays(startMonday: Date, weeks: number): DayColumn[] {
     const dateStr = formatDateISO(d);
     const dow = d.getDay();
     const isMonday = dow === 1;
+    const isInWindow =
+      windowStart !== null && windowEnd !== null
+        ? dateStr >= windowStart && dateStr <= windowEnd
+        : true;
     days.push({
       date: dateStr,
       label: `${DAY_NAMES_PT[dow]} ${d.getDate()}`,
       dayOfWeek: dow,
       isToday: dateStr === todayStr,
       isWeekend: dow === 0 || dow === 6,
+      isInWindow,
       weekLabel: isMonday ? `Sem ${isoWeek(d)}` : null,
     });
   }
   return days;
 }
 
+/**
+ * Weeks needed to cover the planning window starting from the Monday before
+ * (or equal to) `windowStart`. Always returns at least `minWeeks` so the view
+ * is usable even for very short windows.
+ */
+function weeksForWindow(
+  windowStart: string,
+  windowEnd: string,
+  minWeeks: number
+): number {
+  const start = getMonday(new Date(windowStart + "T00:00:00"));
+  const end = new Date(windowEnd + "T00:00:00");
+  const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+  const weeks = Math.ceil(diffDays / 7);
+  return Math.max(weeks, minWeeks);
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const WEEKS_VISIBLE = 3;
+const MIN_WEEKS_VISIBLE = 3;
 const LANE_HEADER_WIDTH = 160;
 const DAY_COL_WIDTH = 72;
 const LANE_HEIGHT = 96;
@@ -149,6 +178,7 @@ function DraggablePieceBlock({
   width,
   height,
   isInProduction,
+  outsideWindow,
 }: {
   piece: Piece;
   color: string;
@@ -158,6 +188,7 @@ function DraggablePieceBlock({
   width: number;
   height: number;
   isInProduction: boolean;
+  outsideWindow: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -177,14 +208,23 @@ function DraggablePieceBlock({
       : {}),
   };
 
+  const baseClass =
+    "absolute rounded-md cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md hover:brightness-95 select-none touch-manipulation";
+  const outsideClass = outsideWindow
+    ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
+    : "";
+
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className="absolute rounded-md cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md hover:brightness-95 select-none touch-manipulation"
+      className={baseClass + outsideClass}
       style={style}
-      title={`${piece.reference} — ${projectName}\n${piece.description ?? ""}\n${piece.scheduled_period}`}
+      title={
+        `${piece.reference} — ${projectName}\n${piece.description ?? ""}\n${piece.scheduled_period}` +
+        (outsideWindow ? "\n⚠ Fora da janela de planeamento activa" : "")
+      }
     >
       <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
         <span className="text-[11px] font-semibold text-white truncate leading-tight">
@@ -196,6 +236,11 @@ function DraggablePieceBlock({
       </div>
       {isInProduction && (
         <div className="absolute top-0.5 right-1 w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+      )}
+      {outsideWindow && (
+        <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/80 rounded px-1 leading-tight">
+          fora
+        </div>
       )}
     </div>
   );
@@ -281,26 +326,64 @@ export function GanttDndChart({
   pieces: initialPieces,
   robots,
   projectMap,
+  planningWindow,
 }: GanttDndChartProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const todayColRef = useRef<HTMLDivElement>(null);
+  const windowStartColRef = useRef<HTMLDivElement>(null);
   const dndId = useId();
 
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
-  const [viewStart, setViewStart] = useState<Date>(() => getMonday(new Date()));
+  // Initial view: Monday on/before the window start. Falls back to today's
+  // Monday when no window exists.
+  const [viewStart, setViewStart] = useState<Date>(() => {
+    if (planningWindow) {
+      return getMonday(new Date(planningWindow.start_date + "T00:00:00"));
+    }
+    return getMonday(new Date());
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     type: "warning" | "error";
   } | null>(null);
 
+  // If the active window changes (after a save), snap the view back to it.
+  useEffect(() => {
+    if (planningWindow) {
+      setViewStart(getMonday(new Date(planningWindow.start_date + "T00:00:00")));
+    }
+  }, [planningWindow?.start_date, planningWindow?.id]);
+
   // Sync with server data when props change
   useEffect(() => {
     setPieces(initialPieces);
   }, [initialPieces]);
 
-  const days = useMemo(() => buildDays(viewStart, WEEKS_VISIBLE), [viewStart]);
+  // Number of weeks shown derives from the active window so the full horizon
+  // is visible. Without a window, fall back to the minimum.
+  const weeksVisible = useMemo(() => {
+    if (planningWindow) {
+      return weeksForWindow(
+        planningWindow.start_date,
+        planningWindow.end_date,
+        MIN_WEEKS_VISIBLE
+      );
+    }
+    return MIN_WEEKS_VISIBLE;
+  }, [planningWindow?.start_date, planningWindow?.end_date]);
+
+  const days = useMemo(
+    () =>
+      buildDays(
+        viewStart,
+        weeksVisible,
+        planningWindow?.start_date ?? null,
+        planningWindow?.end_date ?? null
+      ),
+    [viewStart, weeksVisible, planningWindow?.start_date, planningWindow?.end_date]
+  );
 
   const dateIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -348,16 +431,25 @@ export function GanttDndChart({
     setViewStart(getMonday(new Date()));
   }, []);
 
-  // Scroll to today on mount
-  useEffect(() => {
-    if (todayColRef.current && scrollRef.current) {
-      const container = scrollRef.current;
-      const todayEl = todayColRef.current;
-      const scrollLeft =
-        todayEl.offsetLeft - container.clientWidth / 2 + DAY_COL_WIDTH / 2;
-      container.scrollLeft = Math.max(0, scrollLeft);
+  const goWindowStart = useCallback(() => {
+    if (planningWindow) {
+      setViewStart(
+        getMonday(new Date(planningWindow.start_date + "T00:00:00"))
+      );
     }
-  }, [viewStart]);
+  }, [planningWindow?.start_date]);
+
+  // Scroll behaviour: prefer "today" if it's visible inside the rendered
+  // range; otherwise scroll to the start of the window.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const target = todayColRef.current ?? windowStartColRef.current;
+    if (!target) return;
+    const scrollLeft =
+      target.offsetLeft - container.clientWidth / 2 + DAY_COL_WIDTH / 2;
+    container.scrollLeft = Math.max(0, scrollLeft);
+  }, [viewStart, weeksVisible]);
 
   // Parse droppable ID: "cell-{robotId}-{date}-{period}"
   function parseDropId(id: string): {
@@ -498,6 +590,14 @@ export function GanttDndChart({
           >
             Hoje
           </button>
+          {planningWindow && (
+            <button
+              onClick={goWindowStart}
+              className="px-4 py-1.5 text-sm font-medium bg-white border border-[var(--color-brand-300)] text-[var(--color-brand-700)] rounded-lg hover:bg-[var(--color-brand-50)] transition-colors min-h-[44px]"
+            >
+              Ir para janela
+            </button>
+          )}
           <button
             onClick={() => shiftWeeks(1)}
             className="px-3 py-1.5 text-sm font-medium bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors min-h-[44px] min-w-[44px]"
@@ -568,22 +668,36 @@ export function GanttDndChart({
                 className="flex border-b border-zinc-300"
                 style={{ height: DAY_HEADER_HEIGHT }}
               >
-                {days.map((day) => (
-                  <div
-                    key={day.date}
-                    ref={day.isToday ? todayColRef : undefined}
-                    className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
-                      day.isToday
-                        ? "bg-blue-50 text-blue-700 font-semibold"
-                        : day.isWeekend
-                          ? "bg-zinc-50 text-zinc-400"
-                          : "text-zinc-600"
-                    }`}
-                    style={{ width: DAY_COL_WIDTH }}
-                  >
-                    {day.label}
-                  </div>
-                ))}
+                {days.map((day) => {
+                  const isWindowStart =
+                    planningWindow !== null &&
+                    day.date === planningWindow.start_date;
+                  return (
+                    <div
+                      key={day.date}
+                      ref={
+                        day.isToday
+                          ? todayColRef
+                          : isWindowStart
+                            ? windowStartColRef
+                            : undefined
+                      }
+                      className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
+                        day.isToday
+                          ? "bg-blue-50 text-blue-700 font-semibold"
+                          : !day.isInWindow
+                            ? "bg-zinc-100 text-zinc-400"
+                            : day.isWeekend
+                              ? "bg-zinc-50 text-zinc-400"
+                              : "text-zinc-600"
+                      }`}
+                      style={{ width: DAY_COL_WIDTH }}
+                      title={!day.isInWindow ? "Fora da janela de planeamento" : undefined}
+                    >
+                      {day.label}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Robot lanes */}
@@ -603,9 +717,11 @@ export function GanttDndChart({
                           className={`relative border-r border-zinc-50 ${
                             day.isToday
                               ? "bg-blue-50/40"
-                              : day.isWeekend
-                                ? "bg-zinc-50/60"
-                                : ""
+                              : !day.isInWindow
+                                ? "bg-zinc-100/70"
+                                : day.isWeekend
+                                  ? "bg-zinc-50/60"
+                                  : ""
                           }`}
                           style={{ width: DAY_COL_WIDTH }}
                         >
@@ -646,6 +762,9 @@ export function GanttDndChart({
                       const color = project?.color ?? "#6B7280";
                       const isAM = piece.scheduled_period === "AM";
                       const isInProduction = piece.status === "in_production";
+                      const dayMeta = days[colIdx];
+                      const outsideWindow =
+                        planningWindow !== null && !dayMeta.isInWindow;
 
                       const left = colIdx * DAY_COL_WIDTH + 2;
                       const top = isAM ? 2 : HALF_HEIGHT + 2;
@@ -663,6 +782,7 @@ export function GanttDndChart({
                           width={blockWidth}
                           height={blockHeight}
                           isInProduction={isInProduction}
+                          outsideWindow={outsideWindow}
                         />
                       );
                     })}

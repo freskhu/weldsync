@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Piece, Robot } from "@/lib/types";
+import type { Piece, PlanningWindow, Robot } from "@/lib/types";
 import { ViewSwitcher, type CalendarView } from "./view-switcher";
 import { GanttDndChart } from "@/components/gantt/gantt-dnd-chart";
 import { WeekView } from "./week-view";
@@ -11,12 +11,14 @@ interface CalendarViewsProps {
   pieces: Piece[];
   robots: Robot[];
   projectMap: Record<string, { name: string; color: string }>;
+  planningWindow: PlanningWindow | null;
 }
 
 export function CalendarViews({
   pieces,
   robots,
   projectMap,
+  planningWindow,
 }: CalendarViewsProps) {
   const [view, setView] = useState<CalendarView>("gantt");
 
@@ -34,6 +36,7 @@ export function CalendarViews({
             pieces={pieces}
             robots={robots}
             projectMap={projectMap}
+            planningWindow={planningWindow}
           />
         )}
         {view === "week" && (

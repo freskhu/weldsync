@@ -74,3 +74,13 @@ export interface Program {
   notes: string | null;
   created_at: string;
 }
+
+export interface PlanningWindow {
+  id: string;
+  start_date: string; // ISO date string (YYYY-MM-DD)
+  end_date: string;   // ISO date string (YYYY-MM-DD)
+  label: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
