@@ -13,9 +13,16 @@ export default async function PlanningPage() {
   ]);
 
   // Build lookup maps for the client component
-  const projectMap: Record<string, { name: string; color: string }> = {};
+  const projectMap: Record<
+    string,
+    { name: string; color: string; client_ref: string }
+  > = {};
   for (const p of projects) {
-    projectMap[p.id] = { name: p.name, color: p.color };
+    projectMap[p.id] = {
+      name: p.name,
+      color: p.color,
+      client_ref: p.client_ref,
+    };
   }
 
   const robotMap: Record<number, string> = {};

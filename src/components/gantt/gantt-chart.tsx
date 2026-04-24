@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Piece, PlanningWindow, Robot } from "@/lib/types";
+import { textOn, mutedTextOn } from "@/lib/color-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,7 +12,10 @@ import type { Piece, PlanningWindow, Robot } from "@/lib/types";
 interface GanttChartProps {
   pieces: Piece[];
   robots: Robot[];
-  projectMap: Record<string, { name: string; color: string }>;
+  projectMap: Record<
+    string,
+    { name: string; color: string; client_ref: string }
+  >;
   planningWindow: PlanningWindow | null;
 }
 
@@ -449,6 +453,9 @@ export function GanttChart({
 
                     const project = projectMap[piece.project_id];
                     const color = project?.color ?? "#6B7280";
+                    const clientRef = project?.client_ref ?? "";
+                    const ink = textOn(color);
+                    const inkMuted = mutedTextOn(color);
                     const left = firstVisible * DAY_COL_WIDTH + 2;
                     const width =
                       (lastVisible - firstVisible + 1) * DAY_COL_WIDTH - 4;
@@ -456,12 +463,16 @@ export function GanttChart({
                       planningWindow !== null &&
                       (piece.planned_start_date! < planningWindow.start_date ||
                         piece.planned_end_date! > planningWindow.end_date);
+                    // Label layout: hide details when the block is too narrow
+                    // to render anything useful (< ~60px).
+                    const showLabel = width >= 60;
+                    const showClientRef = width >= 110;
 
                     return (
                       <div
                         key={`range-${piece.id}`}
                         className={
-                          "absolute rounded-md pointer-events-none select-none border border-white/20" +
+                          "absolute rounded-md pointer-events-none select-none overflow-hidden" +
                           (outsideWindow
                             ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
                             : "")
@@ -472,11 +483,32 @@ export function GanttChart({
                           width,
                           height: LANE_HEIGHT - 4,
                           backgroundColor: color,
-                          opacity: 0.25,
+                          opacity: 0.75,
                           zIndex: 0,
                         }}
-                        title={`${piece.reference} — ${project?.name ?? ""}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}`}
-                      />
+                        title={`${clientRef ? clientRef + " · " : ""}${piece.reference} — ${project?.name ?? ""}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}`}
+                      >
+                        {showLabel && (
+                          <div className="px-2 py-1 flex flex-col justify-start h-full">
+                            <span
+                              className="text-[10.5px] font-bold font-mono truncate leading-tight"
+                              style={{ color: ink }}
+                            >
+                              {showClientRef && clientRef
+                                ? `${clientRef} · ${piece.reference}`
+                                : piece.reference}
+                            </span>
+                            {project?.name && width >= 140 && (
+                              <span
+                                className="text-[9.5px] truncate leading-tight"
+                                style={{ color: inkMuted }}
+                              >
+                                {project.name}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
 
@@ -493,6 +525,9 @@ export function GanttChart({
 
                     const project = projectMap[piece.project_id];
                     const color = project?.color ?? "#6B7280";
+                    const clientRef = project?.client_ref ?? "";
+                    const ink = textOn(color);
+                    const inkMuted = mutedTextOn(color);
                     const isAM = piece.scheduled_period === "AM";
                     const isInProduction = piece.status === "in_production";
                     const dayMeta = days[colIdx];
@@ -507,6 +542,9 @@ export function GanttChart({
                     const outsideClass = outsideWindow
                       ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
                       : "";
+                    // DAY_COL_WIDTH is 72 → full label fits. If narrower in
+                    // future, fall back to just reference.
+                    const showClientRef = blockWidth >= 64 && clientRef !== "";
 
                     return (
                       <button
@@ -515,7 +553,7 @@ export function GanttChart({
                           router.push(`/projects/${piece.project_id}`)
                         }
                         className={
-                          "absolute rounded-lg text-left cursor-pointer transition-all duration-150 hover:shadow-[var(--shadow-md)] hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-400)] focus:ring-offset-1" +
+                          "absolute z-10 rounded-lg text-left cursor-pointer transition-all duration-150 hover:shadow-[var(--shadow-md)] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-400)] focus:ring-offset-1" +
                           outsideClass
                         }
                         style={{
@@ -524,26 +562,43 @@ export function GanttChart({
                           width: blockWidth,
                           height: blockHeight,
                           backgroundColor: color,
-                          opacity: isInProduction ? 1 : 0.85,
                         }}
                         title={
-                          `${piece.reference} — ${project?.name ?? "?"}\n${piece.description ?? ""}\n${piece.scheduled_period}` +
+                          `${clientRef ? clientRef + " · " : ""}${piece.reference} — ${project?.name ?? "?"}\n${piece.description ?? ""}\n${piece.scheduled_period}` +
                           (outsideWindow ? "\n⚠ Fora da janela de planeamento activa" : "")
                         }
                       >
                         <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
-                          <span className="text-[11px] font-semibold text-white truncate leading-tight">
+                          <span
+                            className="text-[11px] font-bold font-mono truncate leading-tight"
+                            style={{ color: ink }}
+                          >
                             {piece.reference}
                           </span>
-                          <span className="text-[9px] text-white/80 truncate leading-tight">
-                            {project?.name ?? ""}
-                          </span>
+                          {showClientRef ? (
+                            <span
+                              className="text-[9px] font-mono truncate leading-tight"
+                              style={{ color: inkMuted }}
+                            >
+                              {clientRef}
+                            </span>
+                          ) : (
+                            <span
+                              className="text-[9px] truncate leading-tight"
+                              style={{ color: inkMuted }}
+                            >
+                              {project?.name ?? ""}
+                            </span>
+                          )}
                         </div>
                         {isInProduction && (
-                          <div className="absolute top-0.5 right-1 w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          <div
+                            className="absolute top-0.5 right-1 w-1.5 h-1.5 rounded-full animate-pulse"
+                            style={{ backgroundColor: ink }}
+                          />
                         )}
                         {outsideWindow && (
-                          <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/80 rounded px-1 leading-tight pointer-events-none">
+                          <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/90 rounded px-1 leading-tight pointer-events-none">
                             fora
                           </div>
                         )}

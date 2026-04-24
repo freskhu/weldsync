@@ -28,6 +28,7 @@ import {
   clearPlannedRangeAction,
 } from "@/app/actions/piece-actions";
 import { parseSidebarDragId } from "@/components/calendar/unplanned-sidebar";
+import { textOn, mutedTextOn } from "@/lib/color-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +37,10 @@ import { parseSidebarDragId } from "@/components/calendar/unplanned-sidebar";
 interface GanttDndChartProps {
   pieces: Piece[];
   robots: Robot[];
-  projectMap: Record<string, { name: string; color: string }>;
+  projectMap: Record<
+    string,
+    { name: string; color: string; client_ref: string }
+  >;
   planningWindow: PlanningWindow | null;
   /**
    * Optional left rail rendered INSIDE the DndContext so its draggables share
@@ -187,6 +191,7 @@ function DraggablePieceBlock({
   piece,
   color,
   projectName,
+  clientRef,
   left,
   top,
   width,
@@ -197,6 +202,7 @@ function DraggablePieceBlock({
   piece: Piece;
   color: string;
   projectName: string;
+  clientRef: string;
   left: number;
   top: number;
   width: number;
@@ -210,23 +216,27 @@ function DraggablePieceBlock({
       data: { piece },
     });
 
+  const ink = textOn(color);
+  const inkMuted = mutedTextOn(color);
+
   const style: React.CSSProperties = {
     left,
     top,
     width,
     height,
     backgroundColor: color,
-    opacity: isDragging ? 0.3 : isInProduction ? 1 : 0.85,
+    opacity: isDragging ? 0.3 : 1,
     ...(transform
       ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 50 }
       : {}),
   };
 
   const baseClass =
-    "absolute rounded-md cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md hover:brightness-95 select-none touch-manipulation";
+    "absolute z-10 rounded-md cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md hover:brightness-110 select-none touch-manipulation";
   const outsideClass = outsideWindow
     ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
     : "";
+  const showClientRef = width >= 64 && clientRef !== "";
 
   return (
     <div
@@ -236,23 +246,41 @@ function DraggablePieceBlock({
       className={baseClass + outsideClass}
       style={style}
       title={
-        `${piece.reference} — ${projectName}\n${piece.description ?? ""}\n${piece.scheduled_period}` +
+        `${clientRef ? clientRef + " · " : ""}${piece.reference} — ${projectName}\n${piece.description ?? ""}\n${piece.scheduled_period}` +
         (outsideWindow ? "\n⚠ Fora da janela de planeamento activa" : "")
       }
     >
       <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
-        <span className="text-[11px] font-semibold text-white truncate leading-tight">
+        <span
+          className="text-[11px] font-bold font-mono truncate leading-tight"
+          style={{ color: ink }}
+        >
           {piece.reference}
         </span>
-        <span className="text-[9px] text-white/80 truncate leading-tight">
-          {projectName}
-        </span>
+        {showClientRef ? (
+          <span
+            className="text-[9px] font-mono truncate leading-tight"
+            style={{ color: inkMuted }}
+          >
+            {clientRef}
+          </span>
+        ) : (
+          <span
+            className="text-[9px] truncate leading-tight"
+            style={{ color: inkMuted }}
+          >
+            {projectName}
+          </span>
+        )}
       </div>
       {isInProduction && (
-        <div className="absolute top-0.5 right-1 w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+        <div
+          className="absolute top-0.5 right-1 w-1.5 h-1.5 rounded-full animate-pulse"
+          style={{ backgroundColor: ink }}
+        />
       )}
       {outsideWindow && (
-        <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/80 rounded px-1 leading-tight">
+        <div className="absolute bottom-0.5 right-1 text-[9px] font-bold text-amber-100 bg-amber-700/90 rounded px-1 leading-tight">
           fora
         </div>
       )}
@@ -348,24 +376,30 @@ function DraggableRangeBlock({
       data: { piece, kind: "range" },
     });
 
+  const ink = textOn(color);
+  const inkMuted = mutedTextOn(color);
+
+  // Range blocks use full saturation (the AM/PM slot blocks already sit on
+  // top; translucent ribbons washed out the project color too much). Opacity
+  // drops only while dragging or when another block is hovered on top.
   const style: React.CSSProperties = {
     left,
     top,
     width,
     height,
     backgroundColor: color,
-    opacity: isDragging ? 0.25 : 0.35,
+    opacity: isDragging ? 0.35 : 1,
     ...(transform
       ? {
           transform: `translate(${transform.x}px, ${transform.y}px)`,
           zIndex: 40,
-          opacity: 0.6,
+          opacity: 0.7,
         }
       : {}),
   };
 
   const baseClass =
-    "absolute rounded-md cursor-grab active:cursor-grabbing select-none touch-manipulation border border-white/30 group hover:brightness-95 hover:opacity-60";
+    "absolute rounded-md cursor-grab active:cursor-grabbing select-none touch-manipulation border border-black/10 group hover:brightness-105";
   const outsideClass = outsideWindow
     ? " ring-2 ring-amber-500 ring-offset-1 ring-offset-zinc-100"
     : "";
@@ -380,10 +414,16 @@ function DraggableRangeBlock({
       title={`${piece.reference} — ${projectName}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}\nArrasta o bloco para mover. Arrasta as bordas para ajustar datas. Clica X para remover.`}
     >
       <div className="px-2 py-1 h-full flex flex-col justify-center overflow-hidden pointer-events-none">
-        <span className="text-[11px] font-semibold text-white truncate leading-tight drop-shadow">
+        <span
+          className="text-[11px] font-bold truncate leading-tight"
+          style={{ color: ink }}
+        >
           {piece.reference}
         </span>
-        <span className="text-[9px] text-white/90 truncate leading-tight">
+        <span
+          className="text-[9px] truncate leading-tight"
+          style={{ color: inkMuted }}
+        >
           {projectName}
         </span>
       </div>
@@ -1250,6 +1290,7 @@ export function GanttDndChart({
                           piece={piece}
                           color={color}
                           projectName={project?.name ?? ""}
+                          clientRef={project?.client_ref ?? ""}
                           left={left}
                           top={top}
                           width={blockWidth}

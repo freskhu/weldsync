@@ -11,7 +11,10 @@ import { UnplannedSidebar } from "./unplanned-sidebar";
 interface CalendarViewsProps {
   pieces: Piece[];
   robots: Robot[];
-  projectMap: Record<string, { name: string; color: string }>;
+  projectMap: Record<
+    string,
+    { name: string; color: string; client_ref: string }
+  >;
   planningWindow: PlanningWindow | null;
 }
 

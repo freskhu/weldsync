@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
+import { textOn, mutedTextOn } from "@/lib/color-utils";
+import { deletePieceAction } from "@/app/actions/piece-actions";
 
 // ---------------------------------------------------------------------------
 // Unplanned Sidebar — left rail on the Gantt view listing pieces that have
@@ -24,15 +27,21 @@ export function parseSidebarDragId(id: string): string | null {
 
 interface UnplannedSidebarProps {
   pieces: Piece[];
-  projectMap: Record<string, { name: string; color: string }>;
+  projectMap: Record<
+    string,
+    { name: string; color: string; client_ref: string }
+  >;
 }
 
 interface UnplannedCardProps {
   piece: Piece;
   color: string;
+  clientRef: string;
 }
 
-function UnplannedCard({ piece, color }: UnplannedCardProps) {
+function UnplannedCard({ piece, color, clientRef }: UnplannedCardProps) {
+  const router = useRouter();
+  const [isDeleting, startDeleteTransition] = useTransition();
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: sidebarDragIdFor(piece.id),
@@ -47,7 +56,11 @@ function UnplannedCard({ piece, color }: UnplannedCardProps) {
         }
       : {}),
     opacity: isDragging ? 0.3 : 1,
+    backgroundColor: color,
   };
+
+  const ink = textOn(color);
+  const inkMuted = mutedTextOn(color);
 
   const metric =
     piece.weight_kg != null
@@ -56,57 +69,137 @@ function UnplannedCard({ piece, color }: UnplannedCardProps) {
         ? `${piece.estimated_hours}h`
         : null;
 
+  function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    e.preventDefault();
+    const ok = window.confirm(
+      `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("id", piece.id);
+    fd.set("project_id", piece.project_id);
+    startDeleteTransition(async () => {
+      const result = await deletePieceAction(fd);
+      if (!result.success) {
+        window.alert(
+          `Não foi possível eliminar a peça: ${result.error ?? "erro desconhecido"}`
+        );
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       style={style}
-      className="relative bg-white rounded-lg border border-zinc-200 px-2.5 py-2 cursor-grab active:cursor-grabbing touch-manipulation select-none hover:shadow-sm hover:-translate-y-px transition-all min-h-[44px]"
-      title={`${piece.reference}${piece.description ? ` — ${piece.description}` : ""}\nArrasta para a grelha para agendar`}
+      className="group relative rounded-lg px-2.5 py-2 cursor-grab active:cursor-grabbing touch-manipulation select-none hover:shadow-md hover:-translate-y-px transition-all min-h-[44px] shadow-sm"
+      title={`${clientRef ? clientRef + " · " : ""}${piece.reference}${piece.description ? ` — ${piece.description}` : ""}\nArrasta para a grelha para agendar`}
     >
+      {/* Drag handle wrapper so the delete button sits above it */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
-        style={{ backgroundColor: color }}
+        {...listeners}
+        {...attributes}
+        className="absolute inset-0 rounded-lg"
       />
-      <div className="pl-2 flex items-center justify-between gap-2">
-        <span
-          className="text-[11.5px] font-bold font-mono truncate"
-          style={{ color: "var(--color-ink)" }}
-        >
-          {piece.reference}
-        </span>
-        {piece.urgent && (
-          <svg
-            className="w-3.5 h-3.5 text-[var(--color-danger)] shrink-0"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-label="Urgente"
+
+      <div className="relative flex items-center justify-between gap-2 pointer-events-none">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <span
+            className="text-[11.5px] font-bold font-mono truncate"
+            style={{ color: ink }}
           >
-            <path
-              fillRule="evenodd"
-              d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-              clipRule="evenodd"
-            />
-          </svg>
-        )}
+            {piece.reference}
+          </span>
+          {clientRef && (
+            <span
+              className="text-[10px] font-mono truncate"
+              style={{ color: inkMuted }}
+            >
+              {clientRef}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {piece.urgent && (
+            <svg
+              className="w-3.5 h-3.5 shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-label="Urgente"
+              style={{ color: ink }}
+            >
+              <path
+                fillRule="evenodd"
+                d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                clipRule="evenodd"
+              />
+            </svg>
+          )}
+        </div>
       </div>
       {piece.description && (
         <p
-          className="pl-2 text-[11px] truncate mt-0.5"
-          style={{ color: "var(--color-ink-soft)" }}
+          className="relative text-[11px] truncate mt-0.5 pointer-events-none"
+          style={{ color: inkMuted }}
         >
           {piece.description}
         </p>
       )}
       {metric && (
         <p
-          className="pl-2 text-[10px] mt-0.5"
-          style={{ color: "var(--color-ink-mute)" }}
+          className="relative text-[10px] mt-0.5 pointer-events-none"
+          style={{ color: inkMuted }}
         >
           {metric}
         </p>
       )}
+
+      {/* Delete button — visible on hover / focus, touch-friendly at 44x44 hit */}
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={isDeleting}
+        className="absolute top-0.5 right-0.5 w-8 h-8 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-black/20 disabled:opacity-50 transition-opacity"
+        style={{ color: ink }}
+        title="Eliminar peça definitivamente"
+        aria-label={`Eliminar peça ${piece.reference}`}
+      >
+        {isDeleting ? (
+          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="3"
+              opacity="0.3"
+            />
+            <path
+              d="M12 2a10 10 0 0 1 10 10"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+        ) : (
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        )}
+      </button>
     </div>
   );
 }
@@ -168,16 +261,22 @@ export function UnplannedSidebar({
             const project = projectMap[projectId];
             const name = project?.name ?? "Projecto desconhecido";
             const color = project?.color ?? "#6B7280";
+            const clientRef = project?.client_ref ?? "";
             return (
               <section key={projectId} className="space-y-1.5">
                 <header className="flex items-center gap-2 px-1">
                   <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: color }}
                   />
                   <h3 className="text-[11px] font-semibold text-zinc-700 truncate">
                     {name}
                   </h3>
+                  {clientRef && (
+                    <span className="text-[10px] font-mono text-zinc-500 truncate">
+                      {clientRef}
+                    </span>
+                  )}
                   <span className="text-[10px] text-zinc-400 ml-auto">
                     {projectPieces.length}
                   </span>
@@ -188,6 +287,7 @@ export function UnplannedSidebar({
                       key={piece.id}
                       piece={piece}
                       color={color}
+                      clientRef={clientRef}
                     />
                   ))}
                 </div>
