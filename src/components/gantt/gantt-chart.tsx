@@ -119,6 +119,7 @@ function weeksForWindow(
 const MIN_WEEKS_VISIBLE = 3;
 const LANE_HEADER_WIDTH = 160; // px — narrower for iPad
 const DAY_COL_WIDTH = 72; // px — slightly narrower for iPad
+const HALF_COL_WIDTH = DAY_COL_WIDTH / 2; // 36px — one half-day slot
 const LANE_HEIGHT = 96; // px — split into AM (top 48) + PM (bottom 48), meets 44px touch target
 const HALF_HEIGHT = LANE_HEIGHT / 2;
 const WEEK_HEADER_HEIGHT = 24;
@@ -389,7 +390,7 @@ export function GanttChart({
                           ? windowStartColRef
                           : undefined
                     }
-                    className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
+                    className={`relative flex flex-col items-center justify-center text-xs font-medium border-r border-zinc-100 ${
                       day.isToday
                         ? "bg-[var(--color-brand-50)] text-[var(--color-brand-700)] font-bold"
                         : !day.isInWindow
@@ -399,9 +400,13 @@ export function GanttChart({
                             : "text-zinc-600"
                     }`}
                     style={{ width: DAY_COL_WIDTH }}
-                    title={!day.isInWindow ? "Fora da janela de planeamento" : undefined}
+                    title={!day.isInWindow ? "Fora da janela de planeamento" : "Manhã (M) 8-12h · Tarde (T) 13-17h"}
                   >
-                    {day.label}
+                    <span>{day.label}</span>
+                    <div className="flex w-full text-[8px] text-zinc-400 font-semibold leading-none tracking-wider">
+                      <span className="flex-1 text-center">M</span>
+                      <span className="flex-1 text-center">T</span>
+                    </div>
                   </div>
                 );
               })}
@@ -417,12 +422,12 @@ export function GanttChart({
                   className="relative border-b border-zinc-100"
                   style={{ height: LANE_HEIGHT }}
                 >
-                  {/* Day column backgrounds */}
+                  {/* Day column backgrounds w/ half-day separator */}
                   <div className="absolute inset-0 flex">
                     {days.map((day) => (
                       <div
                         key={day.date}
-                        className={`border-r border-zinc-50 ${
+                        className={`relative border-r border-zinc-50 ${
                           day.isToday
                             ? "bg-blue-50/40"
                             : !day.isInWindow
@@ -432,14 +437,16 @@ export function GanttChart({
                                 : ""
                         }`}
                         style={{ width: DAY_COL_WIDTH }}
-                      />
+                      >
+                        <div
+                          className="absolute top-0 bottom-0 border-l border-dashed border-zinc-200/70 pointer-events-none"
+                          style={{ left: HALF_COL_WIDTH }}
+                        />
+                      </div>
                     ))}
                   </div>
 
-                  {/* Planned-range span blocks (read-only, non-interactive).
-                      Rendered under the AM/PM slot blocks. Uses full lane
-                      height and low opacity so the slot blocks remain
-                      visually prominent. */}
+                  {/* Planned-range span blocks — half-day resolution, read-only. */}
                   {rangePieces.map((piece) => {
                     const startIdx = dateIndex.get(piece.planned_start_date!);
                     const endIdx = dateIndex.get(piece.planned_end_date!);
@@ -447,8 +454,15 @@ export function GanttChart({
                     const clampedStart = startIdx ?? 0;
                     const clampedEnd = endIdx ?? days.length - 1;
                     if (clampedEnd < 0 || clampedStart > days.length - 1) return null;
-                    const firstVisible = Math.max(0, clampedStart);
-                    const lastVisible = Math.min(days.length - 1, clampedEnd);
+                    const startPeriod = piece.planned_start_period ?? "morning";
+                    const endPeriod = piece.planned_end_period ?? "afternoon";
+                    const startSlotAbs =
+                      clampedStart * 2 + (startPeriod === "morning" ? 0 : 1);
+                    const endSlotAbs =
+                      clampedEnd * 2 + (endPeriod === "morning" ? 0 : 1);
+                    const lastSlotIdx = days.length * 2 - 1;
+                    const firstVisible = Math.max(0, startSlotAbs);
+                    const lastVisible = Math.min(lastSlotIdx, endSlotAbs);
                     if (lastVisible < firstVisible) return null;
 
                     const project = projectMap[piece.project_id];
@@ -456,9 +470,9 @@ export function GanttChart({
                     const clientRef = project?.client_ref ?? "";
                     const ink = textOn(color);
                     const inkMuted = mutedTextOn(color);
-                    const left = firstVisible * DAY_COL_WIDTH + 2;
+                    const left = firstVisible * HALF_COL_WIDTH + 2;
                     const width =
-                      (lastVisible - firstVisible + 1) * DAY_COL_WIDTH - 4;
+                      (lastVisible - firstVisible + 1) * HALF_COL_WIDTH - 4;
                     const outsideWindow =
                       planningWindow !== null &&
                       (piece.planned_start_date! < planningWindow.start_date ||

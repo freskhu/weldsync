@@ -155,10 +155,37 @@ function weeksForWindow(
 const MIN_WEEKS_VISIBLE = 3;
 const LANE_HEADER_WIDTH = 160;
 const DAY_COL_WIDTH = 72;
+const HALF_COL_WIDTH = DAY_COL_WIDTH / 2; // 36 — horizontal width of one half-day slot
 const LANE_HEIGHT = 96;
 const HALF_HEIGHT = LANE_HEIGHT / 2;
 const WEEK_HEADER_HEIGHT = 24;
 const DAY_HEADER_HEIGHT = 32;
+
+// ---------------------------------------------------------------------------
+// Half-day helpers
+// ---------------------------------------------------------------------------
+
+/** Convert a (date, period) pair to an absolute half-day ordinal.
+ *  Same scheme as the DB CHECK constraint: daysSinceEpoch * 2 + (AM=0 | PM=1). */
+function halfDayOrdinal(dateISO: string, period: "morning" | "afternoon"): number {
+  const t = Date.parse(dateISO + "T00:00:00Z");
+  const d = Math.round(t / 86_400_000);
+  return d * 2 + (period === "morning" ? 0 : 1);
+}
+
+/** Inverse of halfDayOrdinal — returns { date, period } for an ordinal. */
+function ordinalToHalfDay(ord: number): { date: string; period: "morning" | "afternoon" } {
+  const d = Math.floor(ord / 2);
+  const period: "morning" | "afternoon" = ord % 2 === 0 ? "morning" : "afternoon";
+  const ms = d * 86_400_000;
+  const iso = new Date(ms).toISOString().slice(0, 10);
+  return { date: iso, period };
+}
+
+/** Map legacy AM/PM drop zone label to the half-day period enum. */
+function amPmToPeriod(p: "AM" | "PM"): "morning" | "afternoon" {
+  return p === "AM" ? "morning" : "afternoon";
+}
 
 // ---------------------------------------------------------------------------
 // Droppable Cell — each robot × date × period combo
@@ -411,7 +438,7 @@ function DraggableRangeBlock({
       {...attributes}
       className={baseClass + outsideClass}
       style={style}
-      title={`${piece.reference} — ${projectName}\nPlaneado: ${piece.planned_start_date} → ${piece.planned_end_date}\nArrasta o bloco para mover. Arrasta as bordas para ajustar datas. Clica X para remover.`}
+      title={`${piece.reference} — ${projectName}\nPlaneado: ${piece.planned_start_date} ${piece.planned_start_period === "afternoon" ? "T" : "M"} → ${piece.planned_end_date} ${piece.planned_end_period === "afternoon" ? "T" : "M"}\nArrasta o bloco para mover. Arrasta as bordas para ajustar datas. Clica X para remover. Snap a meio-dia.`}
     >
       <div className="px-2 py-1 h-full flex flex-col justify-center overflow-hidden pointer-events-none">
         <span
@@ -724,7 +751,7 @@ export function GanttDndChart({
 
       const activeIdStr = active.id as string;
 
-      // ---- Resize handle drag: shift only one endpoint ----
+      // ---- Resize handle drag: shift only one endpoint, snap to half-day ----
       if (
         activeIdStr.startsWith("resize-start-") ||
         activeIdStr.startsWith("resize-end-")
@@ -744,27 +771,32 @@ export function GanttDndChart({
           return;
         }
 
-        const dayDelta = Math.round(delta.x / DAY_COL_WIDTH);
-        if (dayDelta === 0) return;
+        // Default periods for legacy rows that haven't been migrated with a period.
+        const startPeriod = piece.planned_start_period ?? "morning";
+        const endPeriod = piece.planned_end_period ?? "afternoon";
 
-        let newStart = piece.planned_start_date;
-        let newEnd = piece.planned_end_date;
+        // Snap to half-day increments. One slot = HALF_COL_WIDTH px.
+        const slotDelta = Math.round(delta.x / HALF_COL_WIDTH);
+        if (slotDelta === 0) return;
+
+        const startOrd = halfDayOrdinal(piece.planned_start_date, startPeriod);
+        const endOrd = halfDayOrdinal(piece.planned_end_date, endPeriod);
+
+        let newStartOrd = startOrd;
+        let newEndOrd = endOrd;
 
         if (edge === "start") {
-          const candidate = addDaysISO(piece.planned_start_date, dayDelta);
-          // Client-side clamp: start cannot cross end (min 1-day duration).
-          newStart = candidate > piece.planned_end_date
-            ? piece.planned_end_date
-            : candidate;
-          if (newStart === piece.planned_start_date) return;
+          // Clamp so start cannot cross end (min 1 slot = half-day duration).
+          newStartOrd = Math.min(startOrd + slotDelta, endOrd);
+          if (newStartOrd === startOrd) return;
         } else {
-          const candidate = addDaysISO(piece.planned_end_date, dayDelta);
-          // Client-side clamp: end cannot cross start (min 1-day duration).
-          newEnd = candidate < piece.planned_start_date
-            ? piece.planned_start_date
-            : candidate;
-          if (newEnd === piece.planned_end_date) return;
+          // Clamp so end cannot cross start (min 1 slot).
+          newEndOrd = Math.max(endOrd + slotDelta, startOrd);
+          if (newEndOrd === endOrd) return;
         }
+
+        const newStartHD = ordinalToHalfDay(newStartOrd);
+        const newEndHD = ordinalToHalfDay(newEndOrd);
 
         const previousPieces = [...pieces];
         setPieces((prev) =>
@@ -772,8 +804,10 @@ export function GanttDndChart({
             p.id === pieceId
               ? {
                   ...p,
-                  planned_start_date: newStart,
-                  planned_end_date: newEnd,
+                  planned_start_date: newStartHD.date,
+                  planned_end_date: newEndHD.date,
+                  planned_start_period: newStartHD.period,
+                  planned_end_period: newEndHD.period,
                 }
               : p
           )
@@ -781,8 +815,10 @@ export function GanttDndChart({
 
         const result = await movePlannedRangeAction({
           pieceId,
-          newStart,
-          newEnd,
+          newStart: newStartHD.date,
+          newEnd: newEndHD.date,
+          newStartPeriod: newStartHD.period,
+          newEndPeriod: newEndHD.period,
           // Robot unchanged on resize.
           robotId: piece.robot_id,
         });
@@ -797,7 +833,7 @@ export function GanttDndChart({
         return;
       }
 
-      // ---- Range (span) block drag: no droppable required ----
+      // ---- Range (span) block drag: no droppable required, snap to half-day ----
       if (activeIdStr.startsWith("range-")) {
         const pieceId = activeIdStr.slice("range-".length);
         const piece = pieces.find((p) => p.id === pieceId);
@@ -809,16 +845,20 @@ export function GanttDndChart({
           return;
         }
 
-        // Snap to day grid via horizontal delta. Snap to lane (robot) via
-        // vertical delta.
-        const dayDelta = Math.round(delta.x / DAY_COL_WIDTH);
+        // Snap to half-day grid horizontally. Snap to lane (robot) vertically.
+        const slotDelta = Math.round(delta.x / HALF_COL_WIDTH);
         const laneDelta = Math.round(delta.y / LANE_HEIGHT);
 
         // No-op drag: zero movement in both axes.
-        if (dayDelta === 0 && laneDelta === 0) return;
+        if (slotDelta === 0 && laneDelta === 0) return;
 
-        const newStart = addDaysISO(piece.planned_start_date, dayDelta);
-        const newEnd = addDaysISO(piece.planned_end_date, dayDelta);
+        const startPeriod = piece.planned_start_period ?? "morning";
+        const endPeriod = piece.planned_end_period ?? "afternoon";
+        const startOrd = halfDayOrdinal(piece.planned_start_date, startPeriod);
+        const endOrd = halfDayOrdinal(piece.planned_end_date, endPeriod);
+
+        const newStartHD = ordinalToHalfDay(startOrd + slotDelta);
+        const newEndHD = ordinalToHalfDay(endOrd + slotDelta);
 
         // Resolve target robot. If lane moved, pick the robot at the new lane.
         let newRobotId: number | null = piece.robot_id;
@@ -840,8 +880,10 @@ export function GanttDndChart({
             p.id === pieceId
               ? {
                   ...p,
-                  planned_start_date: newStart,
-                  planned_end_date: newEnd,
+                  planned_start_date: newStartHD.date,
+                  planned_end_date: newEndHD.date,
+                  planned_start_period: newStartHD.period,
+                  planned_end_period: newEndHD.period,
                   robot_id: newRobotId,
                 }
               : p
@@ -850,8 +892,10 @@ export function GanttDndChart({
 
         const result = await movePlannedRangeAction({
           pieceId,
-          newStart,
-          newEnd,
+          newStart: newStartHD.date,
+          newEnd: newEndHD.date,
+          newStartPeriod: newStartHD.period,
+          newEndPeriod: newEndHD.period,
           robotId: newRobotId,
         });
 
@@ -866,7 +910,8 @@ export function GanttDndChart({
       }
 
       // ---- Sidebar drag (unplanned piece → grid): sets planned range to a
-      //      single day on the drop lane, regardless of AM/PM period. ----
+      //      single half-day slot (1 slot) on the drop lane. User can extend
+      //      via resize handles. ----
       const sidebarPieceId = parseSidebarDragId(activeIdStr);
       if (sidebarPieceId) {
         if (!over) return;
@@ -876,6 +921,7 @@ export function GanttDndChart({
         const piece = pieces.find((p) => p.id === sidebarPieceId);
         if (!piece) return;
 
+        const dropPeriod = amPmToPeriod(target.period);
         const newStart = target.date;
         const newEnd = target.date;
         const newRobotId = target.robotId;
@@ -888,6 +934,8 @@ export function GanttDndChart({
                   ...p,
                   planned_start_date: newStart,
                   planned_end_date: newEnd,
+                  planned_start_period: dropPeriod,
+                  planned_end_period: dropPeriod,
                   robot_id: newRobotId,
                 }
               : p
@@ -898,6 +946,8 @@ export function GanttDndChart({
           pieceId: sidebarPieceId,
           newStart,
           newEnd,
+          newStartPeriod: dropPeriod,
+          newEndPeriod: dropPeriod,
           robotId: newRobotId,
         });
 
@@ -1146,7 +1196,7 @@ export function GanttDndChart({
                             ? windowStartColRef
                             : undefined
                       }
-                      className={`flex items-center justify-center text-xs font-medium border-r border-zinc-100 ${
+                      className={`relative flex flex-col items-center justify-center text-xs font-medium border-r border-zinc-100 ${
                         day.isToday
                           ? "bg-blue-50 text-blue-700 font-semibold"
                           : !day.isInWindow
@@ -1156,9 +1206,14 @@ export function GanttDndChart({
                               : "text-zinc-600"
                       }`}
                       style={{ width: DAY_COL_WIDTH }}
-                      title={!day.isInWindow ? "Fora da janela de planeamento" : undefined}
+                      title={!day.isInWindow ? "Fora da janela de planeamento" : "Manhã (M) 8-12h · Tarde (T) 13-17h"}
                     >
-                      {day.label}
+                      <span>{day.label}</span>
+                      {/* Half-day sub-labels: M (manhã) / T (tarde) */}
+                      <div className="flex w-full text-[8px] text-zinc-400 font-semibold leading-none tracking-wider">
+                        <span className="flex-1 text-center">M</span>
+                        <span className="flex-1 text-center">T</span>
+                      </div>
                     </div>
                   );
                 })}
@@ -1174,7 +1229,10 @@ export function GanttDndChart({
                     className="relative border-b border-zinc-100"
                     style={{ height: LANE_HEIGHT }}
                   >
-                    {/* Day column backgrounds + droppable cells */}
+                    {/* Day column backgrounds + droppable cells.
+                        Each day is split into morning (left half) + afternoon
+                        (right half) droppable targets, stacked AM (top) / PM
+                        (bottom) for scheduled-slot semantics. */}
                     <div className="absolute inset-0 flex">
                       {days.map((day) => (
                         <div
@@ -1190,6 +1248,11 @@ export function GanttDndChart({
                           }`}
                           style={{ width: DAY_COL_WIDTH }}
                         >
+                          {/* Half-day separator (vertical, dashed, subtle) */}
+                          <div
+                            className="absolute top-0 bottom-0 border-l border-dashed border-zinc-200/70 pointer-events-none"
+                            style={{ left: HALF_COL_WIDTH }}
+                          />
                           {/* AM drop zone */}
                           <div
                             className="absolute left-0 right-0"
@@ -1212,30 +1275,37 @@ export function GanttDndChart({
                       ))}
                     </div>
 
-                    {/* Planned-range span blocks (read-only, non-interactive).
+                    {/* Planned-range span blocks — half-day resolution.
                         Rendered under the AM/PM slot blocks so drag targets
-                        remain unobstructed. Uses full lane height. */}
+                        remain unobstructed. Left/width computed in slot units
+                        (1 slot = HALF_COL_WIDTH = 36px). */}
                     {rangePieces.map((piece) => {
                       const startIdx = dateIndex.get(piece.planned_start_date!);
                       const endIdx = dateIndex.get(piece.planned_end_date!);
                       // If neither endpoint is in the visible range, skip.
                       if (startIdx === undefined && endIdx === undefined) return null;
-                      // Clamp to the visible range so partial-visible spans
-                      // still render as a bar from the visible edge.
-                      const clampedStart =
-                        startIdx ?? 0;
-                      const clampedEnd =
-                        endIdx ?? days.length - 1;
+                      const clampedStart = startIdx ?? 0;
+                      const clampedEnd = endIdx ?? days.length - 1;
                       if (clampedEnd < 0 || clampedStart > days.length - 1) return null;
-                      const firstVisible = Math.max(0, clampedStart);
-                      const lastVisible = Math.min(days.length - 1, clampedEnd);
+
+                      // Half-day slot indices within the visible grid.
+                      // slotIdx = dayIdx * 2 + (period === morning ? 0 : 1)
+                      const startPeriod = piece.planned_start_period ?? "morning";
+                      const endPeriod = piece.planned_end_period ?? "afternoon";
+                      const startSlotAbs =
+                        clampedStart * 2 + (startPeriod === "morning" ? 0 : 1);
+                      const endSlotAbs =
+                        clampedEnd * 2 + (endPeriod === "morning" ? 0 : 1);
+                      const lastSlotIdx = days.length * 2 - 1;
+                      const firstVisible = Math.max(0, startSlotAbs);
+                      const lastVisible = Math.min(lastSlotIdx, endSlotAbs);
                       if (lastVisible < firstVisible) return null;
 
                       const project = projectMap[piece.project_id];
                       const color = project?.color ?? "#6B7280";
-                      const left = firstVisible * DAY_COL_WIDTH + 2;
+                      const left = firstVisible * HALF_COL_WIDTH + 2;
                       const width =
-                        (lastVisible - firstVisible + 1) * DAY_COL_WIDTH - 4;
+                        (lastVisible - firstVisible + 1) * HALF_COL_WIDTH - 4;
                       // Check if any day of the planned range is outside the
                       // active planning window (same treatment as scheduled
                       // blocks: amber ring + "fora" badge).
