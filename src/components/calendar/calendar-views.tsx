@@ -6,6 +6,7 @@ import { ViewSwitcher, type CalendarView } from "./view-switcher";
 import { GanttDndChart } from "@/components/gantt/gantt-dnd-chart";
 import { WeekView } from "./week-view";
 import { DayView } from "./day-view";
+import { UnplannedSidebar } from "./unplanned-sidebar";
 
 interface CalendarViewsProps {
   pieces: Piece[];
@@ -37,6 +38,12 @@ export function CalendarViews({
             robots={robots}
             projectMap={projectMap}
             planningWindow={planningWindow}
+            leftSidebar={
+              <UnplannedSidebar
+                pieces={pieces}
+                projectMap={projectMap}
+              />
+            }
           />
         )}
         {view === "week" && (

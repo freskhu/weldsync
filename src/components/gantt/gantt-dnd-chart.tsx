@@ -27,6 +27,7 @@ import {
   movePlannedRangeAction,
   clearPlannedRangeAction,
 } from "@/app/actions/piece-actions";
+import { parseSidebarDragId } from "@/components/calendar/unplanned-sidebar";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,6 +38,12 @@ interface GanttDndChartProps {
   robots: Robot[];
   projectMap: Record<string, { name: string; color: string }>;
   planningWindow: PlanningWindow | null;
+  /**
+   * Optional left rail rendered INSIDE the DndContext so its draggables share
+   * the same sensor/collision pipeline as the grid. Used by the calendar page
+   * to show the unplanned-pieces backlog.
+   */
+  leftSidebar?: React.ReactNode;
 }
 
 interface DayColumn {
@@ -493,6 +500,7 @@ export function GanttDndChart({
   robots,
   projectMap,
   planningWindow,
+  leftSidebar,
 }: GanttDndChartProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const todayColRef = useRef<HTMLDivElement>(null);
@@ -655,10 +663,15 @@ export function GanttDndChart({
     return { robotId, date, period };
   }
 
-  const activePiece = useMemo(
-    () => pieces.find((p) => p.id === activeId) ?? null,
-    [pieces, activeId]
-  );
+  const activePiece = useMemo(() => {
+    if (!activeId) return null;
+    // Sidebar drags carry a `sidebar-{pieceId}` id; resolve to the piece.
+    const sidebarPieceId = parseSidebarDragId(activeId);
+    if (sidebarPieceId) {
+      return pieces.find((p) => p.id === sidebarPieceId) ?? null;
+    }
+    return pieces.find((p) => p.id === activeId) ?? null;
+  }, [pieces, activeId]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -812,6 +825,52 @@ export function GanttDndChart({
         return;
       }
 
+      // ---- Sidebar drag (unplanned piece → grid): sets planned range to a
+      //      single day on the drop lane, regardless of AM/PM period. ----
+      const sidebarPieceId = parseSidebarDragId(activeIdStr);
+      if (sidebarPieceId) {
+        if (!over) return;
+        const target = parseDropId(over.id as string);
+        if (!target) return;
+
+        const piece = pieces.find((p) => p.id === sidebarPieceId);
+        if (!piece) return;
+
+        const newStart = target.date;
+        const newEnd = target.date;
+        const newRobotId = target.robotId;
+
+        const previousPieces = [...pieces];
+        setPieces((prev) =>
+          prev.map((p) =>
+            p.id === sidebarPieceId
+              ? {
+                  ...p,
+                  planned_start_date: newStart,
+                  planned_end_date: newEnd,
+                  robot_id: newRobotId,
+                }
+              : p
+          )
+        );
+
+        const result = await movePlannedRangeAction({
+          pieceId: sidebarPieceId,
+          newStart,
+          newEnd,
+          robotId: newRobotId,
+        });
+
+        if (!result.success) {
+          setPieces(previousPieces);
+          setToast({
+            message: result.error ?? "Erro ao agendar peça.",
+            type: "error",
+          });
+        }
+        return;
+      }
+
       // ---- Slot (AM/PM) block drag: requires droppable target ----
       if (!over) return;
 
@@ -938,7 +997,9 @@ export function GanttDndChart({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex flex-col h-full">
+      <div className="flex h-full gap-3 min-h-0">
+        {leftSidebar}
+        <div className="flex flex-col h-full flex-1 min-w-0">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
           <button
@@ -1203,6 +1264,7 @@ export function GanttDndChart({
               })}
             </div>
           </div>
+        </div>
         </div>
       </div>
 
