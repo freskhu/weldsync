@@ -27,6 +27,8 @@ export async function createProjectAction(
     client_name: formData.get("client_name") as string,
     color: formData.get("color") as string || "#3B82F6",
     deadline: (formData.get("deadline") as string) || null,
+    start_date: (formData.get("start_date") as string) || null,
+    end_date: (formData.get("end_date") as string) || null,
     notes: (formData.get("notes") as string) || null,
   };
 
@@ -59,6 +61,8 @@ export async function createProjectAction(
     client_name: result.data.client_name,
     color: result.data.color,
     deadline: result.data.deadline ?? null,
+    start_date: result.data.start_date ?? null,
+    end_date: result.data.end_date ?? null,
     status: result.data.status,
     notes: result.data.notes ?? null,
   });
@@ -83,6 +87,8 @@ export async function updateProjectAction(
     client_name: formData.get("client_name") as string,
     color: formData.get("color") as string || project.color,
     deadline: (formData.get("deadline") as string) || null,
+    start_date: (formData.get("start_date") as string) || null,
+    end_date: (formData.get("end_date") as string) || null,
     notes: (formData.get("notes") as string) || null,
   };
 
@@ -117,6 +123,8 @@ export async function updateProjectAction(
     ...(result.data.client_name && { client_name: result.data.client_name }),
     ...(result.data.color && { color: result.data.color }),
     deadline: result.data.deadline ?? null,
+    start_date: result.data.start_date ?? null,
+    end_date: result.data.end_date ?? null,
     notes: result.data.notes ?? null,
   });
 

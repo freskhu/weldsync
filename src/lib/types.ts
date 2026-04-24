@@ -31,6 +31,10 @@ export interface Project {
   client_name: string;
   color: string;
   deadline: string | null;
+  /** Project planning window start (ISO YYYY-MM-DD). Paired with end_date. */
+  start_date: string | null;
+  /** Project planning window end (ISO YYYY-MM-DD). Paired with start_date. */
+  end_date: string | null;
   status: ProjectStatus;
   notes: string | null;
   created_at: string;
@@ -51,6 +55,10 @@ export interface Piece {
   robot_id: number | null;
   scheduled_date: string | null;
   scheduled_period: SchedulePeriod | null;
+  /** Planned range start (ISO YYYY-MM-DD). Paired with planned_end_date. */
+  planned_start_date: string | null;
+  /** Planned range end (ISO YYYY-MM-DD). Paired with planned_start_date. */
+  planned_end_date: string | null;
   urgent: boolean;
   barcode: string | null;
   program_id: string | null;

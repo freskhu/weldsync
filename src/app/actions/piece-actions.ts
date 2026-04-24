@@ -44,6 +44,8 @@ export async function createPieceAction(
     quantity: parseNumber(formData.get("quantity") as string) ?? 1,
     weight_kg: parseNumber(formData.get("weight_kg") as string),
     estimated_hours: parseNumber(formData.get("estimated_hours") as string),
+    planned_start_date: (formData.get("planned_start_date") as string) || null,
+    planned_end_date: (formData.get("planned_end_date") as string) || null,
     urgent: formData.get("urgent") === "on",
     barcode: (formData.get("barcode") as string) || null,
   };
@@ -86,6 +88,8 @@ export async function createPieceAction(
     robot_id: null,
     scheduled_date: null,
     scheduled_period: null,
+    planned_start_date: result.data.planned_start_date ?? null,
+    planned_end_date: result.data.planned_end_date ?? null,
     urgent: result.data.urgent,
     barcode: result.data.barcode ?? null,
     program_id: null,
@@ -116,6 +120,8 @@ export async function updatePieceAction(
     quantity: parseNumber(formData.get("quantity") as string) ?? 1,
     weight_kg: parseNumber(formData.get("weight_kg") as string),
     estimated_hours: parseNumber(formData.get("estimated_hours") as string),
+    planned_start_date: (formData.get("planned_start_date") as string) || null,
+    planned_end_date: (formData.get("planned_end_date") as string) || null,
     urgent: formData.get("urgent") === "on",
     barcode: (formData.get("barcode") as string) || null,
   };
@@ -155,6 +161,8 @@ export async function updatePieceAction(
     ...(result.data.quantity !== undefined && { quantity: result.data.quantity }),
     weight_kg: result.data.weight_kg ?? null,
     estimated_hours: result.data.estimated_hours ?? null,
+    planned_start_date: result.data.planned_start_date ?? null,
+    planned_end_date: result.data.planned_end_date ?? null,
     urgent: result.data.urgent ?? piece.urgent,
     barcode: result.data.barcode ?? null,
   });
