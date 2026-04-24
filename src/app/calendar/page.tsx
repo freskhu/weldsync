@@ -3,6 +3,7 @@ import { getRobots } from "@/lib/data/programs";
 import { getActivePlanningWindow } from "@/lib/data/planning-window";
 import { CalendarViews } from "@/components/calendar/calendar-views";
 import { PlanningWindowBar } from "@/components/planning/planning-window-bar";
+import { PrintButton } from "@/components/calendar/print-button";
 
 export default async function CalendarPage() {
   const [pieces, projects, robots, planningWindow] = await Promise.all([
@@ -27,7 +28,13 @@ export default async function CalendarPage() {
 
   return (
     <div className="p-4 md:p-6 h-screen flex flex-col">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-4">Calendário</h1>
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h1 className="text-2xl font-bold text-zinc-900">Calendário</h1>
+        <PrintButton
+          startDate={planningWindow?.start_date ?? null}
+          endDate={planningWindow?.end_date ?? null}
+        />
+      </div>
       <div className="mb-4 flex-shrink-0">
         <PlanningWindowBar window={planningWindow} />
       </div>

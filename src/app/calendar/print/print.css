@@ -1,0 +1,384 @@
+/*
+ * Print stylesheet (A4 landscape).
+ *
+ * Screen preview mirrors the printed layout so the user can sanity-check
+ * before hitting print. All swatch/block colors force-render via
+ * print-color-adjust. Pattern fallback stripes kick in when printed as
+ * greyscale (diagonal lines via linear-gradient are greyscale-friendly).
+ */
+
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+.print-root {
+  background: #fff;
+  color: #18181b;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 10pt;
+  line-height: 1.3;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Screen preview: simulate an A4 landscape sheet */
+@media screen {
+  .print-root {
+    min-height: 100vh;
+    padding: 20px;
+    background: #e4e4e7;
+  }
+  .print-page {
+    background: #fff;
+    width: 297mm;
+    min-height: 210mm;
+    margin: 0 auto;
+    padding: 10mm;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    box-sizing: border-box;
+  }
+}
+
+@media print {
+  /* Hide anything outside our print root (sidebars, toasts, dev overlays) */
+  body > *:not(.print-root-wrapper):not(.print-root) {
+    display: none !important;
+  }
+  .print-root {
+    padding: 0;
+    background: #fff;
+  }
+  .print-page {
+    padding: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Header                                                            */
+/* ---------------------------------------------------------------- */
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 2px solid #18181b;
+  padding-bottom: 4mm;
+  margin-bottom: 5mm;
+}
+
+.print-title {
+  font-size: 14pt;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.print-subtitle {
+  font-size: 10pt;
+  margin: 1mm 0 0 0;
+  color: #3f3f46;
+}
+
+.print-printed-at {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 8pt;
+  color: #52525b;
+  text-align: right;
+}
+
+.print-printed-at .print-label {
+  text-transform: uppercase;
+  font-size: 7pt;
+  letter-spacing: 0.05em;
+  color: #71717a;
+}
+
+.print-section-title {
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #52525b;
+  margin: 0 0 2mm 0;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #d4d4d8;
+}
+
+/* ---------------------------------------------------------------- */
+/* Gantt                                                             */
+/* ---------------------------------------------------------------- */
+
+.print-gantt-section {
+  margin-bottom: 5mm;
+}
+
+.print-gantt {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 8pt;
+}
+
+.print-gantt th,
+.print-gantt td {
+  border: 0.5pt solid #a1a1aa;
+  padding: 0;
+  vertical-align: top;
+}
+
+.print-gantt thead th {
+  background: #f4f4f5;
+  font-weight: 600;
+  padding: 1.5mm 1mm;
+  text-align: center;
+}
+
+.print-gantt .print-gantt-robot-col {
+  width: 28mm;
+}
+
+.print-gantt .print-gantt-day {
+  padding: 1mm;
+  font-size: 8pt;
+}
+
+.print-gantt .print-gantt-day-weekend {
+  background: #f4f4f5;
+  color: #a1a1aa;
+}
+
+.print-gantt .print-gantt-robot-cell {
+  padding: 1.5mm;
+  background: #fafafa;
+  font-weight: 600;
+  font-size: 8pt;
+  vertical-align: middle;
+}
+
+.print-gantt .print-gantt-robot-name {
+  display: block;
+}
+.print-gantt .print-gantt-robot-capacity {
+  display: block;
+  font-weight: 400;
+  font-size: 7pt;
+  color: #71717a;
+  margin-top: 0.5mm;
+}
+
+.print-gantt-cell {
+  min-height: 12mm;
+  padding: 0;
+  position: relative;
+}
+
+.print-gantt-slot {
+  min-height: 6mm;
+  padding: 0.5mm;
+  position: relative;
+}
+
+.print-gantt-slot + .print-gantt-slot {
+  border-top: 0.5pt dashed #d4d4d8;
+}
+
+.print-gantt-slot-label {
+  position: absolute;
+  top: 0.3mm;
+  left: 0.5mm;
+  font-size: 6pt;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.print-gantt-block {
+  border: 0.5pt solid #18181b;
+  padding: 0.8mm 1.2mm;
+  margin-top: 1.8mm;
+  border-radius: 0.8mm;
+  font-size: 7pt;
+  line-height: 1.15;
+  color: #fff;
+  overflow: hidden;
+  /* Pattern fallback for greyscale printing: subtle diagonal lines */
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0,
+    transparent 1.4mm,
+    rgba(0, 0, 0, 0.08) 1.4mm,
+    rgba(0, 0, 0, 0.08) 2mm
+  );
+  background-blend-mode: multiply;
+}
+
+.print-gantt-block + .print-gantt-block {
+  margin-top: 0.8mm;
+}
+
+.print-gantt-block-ref {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-weight: 700;
+  font-size: 7pt;
+  display: block;
+}
+
+.print-gantt-block-client {
+  display: block;
+  font-size: 6.5pt;
+  opacity: 0.9;
+}
+
+/* ---------------------------------------------------------------- */
+/* Legend                                                            */
+/* ---------------------------------------------------------------- */
+
+.print-legend-section {
+  margin-bottom: 4mm;
+}
+
+.print-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm 4mm;
+  font-size: 8.5pt;
+}
+
+.print-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  padding: 0.8mm 2mm;
+  border: 0.5pt solid #d4d4d8;
+  border-radius: 1mm;
+  background: #fff;
+}
+
+.print-legend-swatch {
+  width: 4mm;
+  height: 4mm;
+  border: 0.5pt solid #18181b;
+  border-radius: 0.8mm;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0,
+    transparent 0.8mm,
+    rgba(0, 0, 0, 0.12) 0.8mm,
+    rgba(0, 0, 0, 0.12) 1.2mm
+  );
+  background-blend-mode: multiply;
+  flex-shrink: 0;
+}
+
+.print-legend-ref {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-weight: 700;
+}
+.print-legend-count {
+  color: #71717a;
+  font-size: 7.5pt;
+}
+
+.print-legend-empty {
+  color: #71717a;
+  font-size: 8pt;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------- */
+/* Detail table                                                      */
+/* ---------------------------------------------------------------- */
+
+.print-table-section {
+  margin-bottom: 4mm;
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+  table-layout: fixed;
+}
+
+.print-table thead {
+  display: table-header-group; /* repeat header on each printed page */
+}
+
+.print-table th {
+  background: #18181b;
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+  padding: 1.5mm 2mm;
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 0.5pt solid #18181b;
+}
+
+.print-table td {
+  padding: 1.2mm 2mm;
+  border: 0.5pt solid #d4d4d8;
+  vertical-align: top;
+  word-wrap: break-word;
+}
+
+.print-table tbody tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-table tbody tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+.print-table .col-robot { width: 12%; }
+.print-table .col-project { width: 26%; }
+.print-table .col-piece { width: 18%; }
+.print-table .col-start { width: 13%; }
+.print-table .col-end { width: 13%; }
+.print-table .col-material { width: 18%; }
+
+.print-table-project {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+
+.print-table-swatch {
+  width: 3mm;
+  height: 3mm;
+  border: 0.5pt solid #18181b;
+  border-radius: 0.5mm;
+  flex-shrink: 0;
+}
+
+.print-table-mono {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-weight: 600;
+}
+
+.print-table-empty {
+  text-align: center;
+  color: #71717a;
+  font-style: italic;
+  padding: 4mm;
+}
+
+/* ---------------------------------------------------------------- */
+/* Footer                                                            */
+/* ---------------------------------------------------------------- */
+
+.print-footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 0.5pt solid #d4d4d8;
+  margin-top: 4mm;
+  padding-top: 2mm;
+  font-size: 7.5pt;
+  color: #71717a;
+}
