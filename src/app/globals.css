@@ -22,6 +22,8 @@
   /* Status Colors — Pipeline */
   --color-status-backlog: #676879;
   --color-status-backlog-bg: #E6E7EA;
+  --color-status-planned: #579BFC;
+  --color-status-planned-bg: #DCE7FE;
   --color-status-programmed: #0086C0;
   --color-status-programmed-bg: #CFE7F5;
   --color-status-allocated: #A25DDC;
@@ -126,6 +128,7 @@ button, a, input, select, textarea {
    Status pill classes (usable via className)
    ---------------------------------------------------------------- */
 .pill-backlog { background: var(--color-status-backlog-bg); color: var(--color-status-backlog); }
+.pill-planned { background: var(--color-status-planned-bg); color: #1E58C8; }
 .pill-programmed { background: var(--color-status-programmed-bg); color: var(--color-status-programmed); }
 .pill-allocated { background: var(--color-status-allocated-bg); color: var(--color-status-allocated); }
 .pill-production { background: var(--color-status-production-bg); color: #B56E00; }
@@ -133,6 +136,7 @@ button, a, input, select, textarea {
 
 /* Solid status pills (for column headers) */
 .pill-solid-backlog { background: var(--color-status-backlog); color: white; }
+.pill-solid-planned { background: var(--color-status-planned); color: white; }
 .pill-solid-programmed { background: var(--color-status-programmed); color: white; }
 .pill-solid-allocated { background: var(--color-status-allocated); color: white; }
 .pill-solid-production { background: var(--color-status-production); color: white; }
@@ -174,6 +178,7 @@ button, a, input, select, textarea {
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 .status-card-accent.accent-backlog::before { background: var(--color-status-backlog); }
+.status-card-accent.accent-planned::before { background: var(--color-status-planned); }
 .status-card-accent.accent-programmed::before { background: var(--color-status-programmed); }
 .status-card-accent.accent-allocated::before { background: var(--color-status-allocated); }
 .status-card-accent.accent-production::before { background: var(--color-status-production); }
@@ -183,6 +188,7 @@ button, a, input, select, textarea {
    Kanban column headers
    ---------------------------------------------------------------- */
 .kcol-backlog { background: var(--color-status-backlog); }
+.kcol-planned { background: var(--color-status-planned); }
 .kcol-programmed { background: var(--color-status-programmed); }
 .kcol-allocated { background: var(--color-status-allocated); }
 .kcol-production { background: var(--color-status-production); }

@@ -6,6 +6,7 @@
 export type ProjectStatus = "active" | "completed" | "archived";
 export type PieceStatus =
   | "backlog"
+  | "planned"
   | "programmed"
   | "allocated"
   | "in_production"

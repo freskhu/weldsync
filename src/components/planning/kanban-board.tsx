@@ -25,7 +25,9 @@ import { AllocationModal } from "./allocation-modal";
 
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
+  { id: "planned", label: "Planeados" },
   { id: "programmed", label: "Programada" },
+  { id: "completed", label: "Finalizados" },
 ];
 
 interface KanbanBoardProps {
@@ -121,6 +123,7 @@ export function KanbanBoard({
   const columnPieces = useMemo(() => {
     const map: Record<PieceStatus, Piece[]> = {
       backlog: [],
+      planned: [],
       programmed: [],
       allocated: [],
       in_production: [],
@@ -217,12 +220,28 @@ export function KanbanBoard({
         return;
       }
 
-      // Standard move (non-allocation columns)
+      // Standard move (non-allocation columns).
+      // Special case: dropping into "completed" clears calendar + robot to mirror
+      // the server action (atomic UPDATE). This keeps the optimistic UI honest.
       const previousPieces = [...pieces];
       setPieces((prev) =>
-        prev.map((p) =>
-          p.id === pieceId ? { ...p, status: targetStatus } : p
-        )
+        prev.map((p) => {
+          if (p.id !== pieceId) return p;
+          if (targetStatus === "completed") {
+            return {
+              ...p,
+              status: targetStatus,
+              robot_id: null,
+              scheduled_date: null,
+              scheduled_period: null,
+              planned_start_date: null,
+              planned_end_date: null,
+              planned_start_period: null,
+              planned_end_period: null,
+            };
+          }
+          return { ...p, status: targetStatus };
+        })
       );
 
       const result = await movePieceAction(pieceId, targetStatus);

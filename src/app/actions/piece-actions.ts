@@ -218,6 +218,7 @@ export async function updatePieceAction(
 
 const VALID_STATUSES: PieceStatus[] = [
   "backlog",
+  "planned",
   "programmed",
   "allocated",
   "in_production",
@@ -235,7 +236,22 @@ export async function movePieceAction(
 
   let piece;
   try {
-    piece = await dbMovePiece(pieceId, newStatus);
+    if (newStatus === "completed") {
+      // Drop to "Finalizados" — clear calendar slot + robot atomically.
+      // The piece must leave the calendar and free the robot when finished.
+      piece = await dbUpdatePiece(pieceId, {
+        status: "completed",
+        planned_start_date: null,
+        planned_end_date: null,
+        planned_start_period: null,
+        planned_end_period: null,
+        robot_id: null,
+        scheduled_date: null,
+        scheduled_period: null,
+      });
+    } else {
+      piece = await dbMovePiece(pieceId, newStatus);
+    }
   } catch (err) {
     if (err instanceof PieceOverlapError) {
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
@@ -245,6 +261,8 @@ export async function movePieceAction(
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
   revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
   return { success: true };
 }
 

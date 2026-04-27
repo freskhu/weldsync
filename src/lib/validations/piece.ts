@@ -21,7 +21,14 @@ const pieceBaseObject = z.object({
     .nullable()
     .optional(),
   status: z
-    .enum(["backlog", "programmed", "allocated", "in_production", "completed"])
+    .enum([
+      "backlog",
+      "planned",
+      "programmed",
+      "allocated",
+      "in_production",
+      "completed",
+    ])
     .default("backlog"),
   robot_id: z.number().int().positive().nullable().optional(),
   scheduled_date: z.string().date().nullable().optional(),

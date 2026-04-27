@@ -13,6 +13,7 @@ interface KanbanColumnProps {
 
 const STATUS_COLORS: Record<string, { bar: string; badge: string; badgeText: string }> = {
   backlog: { bar: "var(--color-status-backlog)", badge: "bg-[var(--color-status-backlog-bg)]", badgeText: "text-[var(--color-status-backlog-text)]" },
+  planned: { bar: "var(--color-status-planned)", badge: "bg-[var(--color-status-planned-bg)]", badgeText: "text-[var(--color-status-planned-text)]" },
   programmed: { bar: "var(--color-status-programmed)", badge: "bg-[var(--color-status-programmed-bg)]", badgeText: "text-[var(--color-status-programmed-text)]" },
   allocated: { bar: "var(--color-status-allocated)", badge: "bg-[var(--color-status-allocated-bg)]", badgeText: "text-[var(--color-status-allocated-text)]" },
   in_production: { bar: "var(--color-status-production)", badge: "bg-[var(--color-status-production-bg)]", badgeText: "text-[var(--color-status-production-text)]" },

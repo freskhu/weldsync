@@ -127,6 +127,7 @@ export async function getRobotOccupancyAsync(
 
 const STATUS_CONFIG: Record<PieceStatus, { label: string; color: string }> = {
   backlog: { label: "Backlog", color: "#3B82F6" },
+  planned: { label: "Planeada", color: "#0EA5E9" },
   programmed: { label: "Programada", color: "#8B5CF6" },
   allocated: { label: "Alocada", color: "#F97316" },
   in_production: { label: "Em Producao", color: "#22C55E" },
@@ -143,6 +144,7 @@ export async function getPipelineCounts(): Promise<PipelineCount[]> {
 
   const order: PieceStatus[] = [
     "backlog",
+    "planned",
     "programmed",
     "allocated",
     "in_production",
