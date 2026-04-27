@@ -22,6 +22,7 @@ import { KanbanColumn } from "./kanban-column";
 import { PieceCard } from "./piece-card";
 import { KanbanFilters } from "./kanban-filters";
 import { AllocationModal } from "./allocation-modal";
+import { RobotPickerModal } from "./robot-picker-modal";
 
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
@@ -49,6 +50,8 @@ export function KanbanBoard({
 
   // Allocation modal state
   const [pendingAllocation, setPendingAllocation] = useState<Piece | null>(null);
+  // Robot picker modal state (for "programmed" drop)
+  const [pendingProgram, setPendingProgram] = useState<Piece | null>(null);
 
   // Filters
   const [filterProject, setFilterProject] = useState<string>("");
@@ -182,6 +185,14 @@ export function KanbanBoard({
         return;
       }
 
+      // If dropping on "programmed", open robot picker modal.
+      // No optimistic update — piece stays in its current column until the
+      // user confirms a robot. Cancel = no-op, no revert needed.
+      if (targetStatus === "programmed") {
+        setPendingProgram(piece);
+        return;
+      }
+
       // If moving OUT of "allocated", deallocate (targetStatus !== "allocated" is guaranteed above)
       if (piece.status === "allocated") {
         const previousPieces = [...pieces];
@@ -283,6 +294,31 @@ export function KanbanBoard({
     setPendingAllocation(null);
   }, []);
 
+  const handleProgramConfirm = useCallback(
+    (robotId: number) => {
+      if (!pendingProgram) return;
+      // Server already persisted (action ran before this callback fired).
+      // Just sync local state.
+      setPieces((prev) =>
+        prev.map((p) =>
+          p.id === pendingProgram.id
+            ? { ...p, status: "programmed" as PieceStatus, robot_id: robotId }
+            : p
+        )
+      );
+      setPendingProgram(null);
+    },
+    [pendingProgram]
+  );
+
+  const handleProgramCancel = useCallback(() => {
+    setPendingProgram(null);
+  }, []);
+
+  const handleDeletePiece = useCallback((pieceId: string) => {
+    setPieces((prev) => prev.filter((p) => p.id !== pieceId));
+  }, []);
+
   const hasFilters = !!(filterProject || filterRobot || filterUrgent);
 
   return (
@@ -330,6 +366,7 @@ export function KanbanBoard({
                     piece.robot_id ? robotMap[piece.robot_id] ?? null : null
                   }
                   isDragging={activeId === piece.id}
+                  onDeleted={handleDeletePiece}
                 />
               ))}
             </KanbanColumn>
@@ -365,6 +402,17 @@ export function KanbanBoard({
           robotLoads={robotLoads}
           onConfirm={handleAllocationConfirm}
           onCancel={handleAllocationCancel}
+        />
+      )}
+
+      {/* Robot picker modal (for Programada drop) */}
+      {pendingProgram && (
+        <RobotPickerModal
+          piece={pendingProgram}
+          robots={robots}
+          initialRobotId={pendingProgram.robot_id}
+          onConfirm={handleProgramConfirm}
+          onCancel={handleProgramCancel}
         />
       )}
     </div>

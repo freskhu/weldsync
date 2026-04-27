@@ -412,6 +412,43 @@ export async function deallocatePieceAction(
   return { success: true };
 }
 
+/**
+ * Atomically sets a piece's status to "programmed" and assigns a robot_id.
+ * Used by the kanban "Programada" column drop flow — the user picks which
+ * robot was programmed and we persist both fields in one UPDATE.
+ *
+ * Does NOT touch dates (planned_*, scheduled_*). Robot picker is purely a
+ * "which station did this get programmed on" record.
+ */
+export async function programPieceWithRobotAction(
+  pieceId: string,
+  robotId: number
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+  if (!Number.isInteger(robotId) || robotId <= 0) {
+    return { success: false, error: "Robot invalido." };
+  }
+
+  let piece;
+  try {
+    piece = await dbUpdatePiece(pieceId, {
+      status: "programmed",
+      robot_id: robotId,
+    });
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
 // --- Planned range (span block) actions ---
 
 const movePlannedRangeSchema = z

@@ -31,15 +31,25 @@ interface UnplannedSidebarProps {
     string,
     { name: string; color: string; client_ref: string }
   >;
+  /** Robot id -> name lookup. Used to surface the assigned robot on cards
+   *  that already have a robot_id (e.g. piece programmed but not yet
+   *  scheduled in the calendar). */
+  robotMap?: Record<number, string>;
 }
 
 interface UnplannedCardProps {
   piece: Piece;
   color: string;
   clientRef: string;
+  robotName: string | null;
 }
 
-function UnplannedCard({ piece, color, clientRef }: UnplannedCardProps) {
+function UnplannedCard({
+  piece,
+  color,
+  clientRef,
+  robotName,
+}: UnplannedCardProps) {
   const router = useRouter();
   const [isDeleting, startDeleteTransition] = useTransition();
   const { attributes, listeners, setNodeRef, transform, isDragging } =
@@ -156,6 +166,17 @@ function UnplannedCard({ piece, color, clientRef }: UnplannedCardProps) {
           {metric}
         </p>
       )}
+      {robotName && (
+        <div className="relative mt-1 pointer-events-none">
+          <span
+            className="inline-flex items-center text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-black/15 max-w-full truncate"
+            style={{ color: ink }}
+            title={`Robot: ${robotName}`}
+          >
+            {robotName}
+          </span>
+        </div>
+      )}
 
       {/* Delete button — visible on hover / focus, touch-friendly at 44x44 hit */}
       <button
@@ -207,6 +228,7 @@ function UnplannedCard({ piece, color, clientRef }: UnplannedCardProps) {
 export function UnplannedSidebar({
   pieces,
   projectMap,
+  robotMap,
 }: UnplannedSidebarProps) {
   const unplanned = useMemo(
     () =>
@@ -288,6 +310,11 @@ export function UnplannedSidebar({
                       piece={piece}
                       color={color}
                       clientRef={clientRef}
+                      robotName={
+                        piece.robot_id != null
+                          ? robotMap?.[piece.robot_id] ?? null
+                          : null
+                      }
                     />
                   ))}
                 </div>

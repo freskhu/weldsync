@@ -1,7 +1,9 @@
 "use client";
 
+import { useTransition } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
+import { deletePieceAction } from "@/app/actions/piece-actions";
 
 interface PieceCardProps {
   piece: Piece;
@@ -10,6 +12,8 @@ interface PieceCardProps {
   robotName: string | null;
   isDragging?: boolean;
   isOverlay?: boolean;
+  /** Called after the piece is successfully deleted on the server. */
+  onDeleted?: (pieceId: string) => void;
 }
 
 function getDeadlineInfo(deadline: string | null): {
@@ -39,10 +43,12 @@ export function PieceCard({
   robotName,
   isDragging = false,
   isOverlay = false,
+  onDeleted,
 }: PieceCardProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: piece.id,
   });
+  const [isDeleting, startDeleteTransition] = useTransition();
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
@@ -50,13 +56,43 @@ export function PieceCard({
 
   const deadlineInfo = getDeadlineInfo(piece.scheduled_date);
 
+  function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
+    // Prevent dnd-kit from interpreting this as the start of a drag.
+    e.stopPropagation();
+    e.preventDefault();
+    if (isOverlay) return;
+    const ok = window.confirm(
+      `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("id", piece.id);
+    fd.set("project_id", piece.project_id);
+    startDeleteTransition(async () => {
+      const result = await deletePieceAction(fd);
+      if (!result.success) {
+        window.alert(
+          `Não foi possível eliminar a peça: ${result.error ?? "erro desconhecido"}`
+        );
+        return;
+      }
+      onDeleted?.(piece.id);
+    });
+  }
+
+  function handleDeletePointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    // Stop pointer events from bubbling to the draggable wrapper. Without
+    // this the dnd-kit MouseSensor swallows the click before it lands.
+    e.stopPropagation();
+  }
+
   return (
     <div
       ref={!isOverlay ? setNodeRef : undefined}
       style={style}
       {...(!isOverlay ? { ...listeners, ...attributes } : {})}
       className={`
-        relative bg-[var(--color-surface-card)] rounded-xl
+        group relative bg-[var(--color-surface-card)] rounded-xl
         cursor-grab active:cursor-grabbing
         min-h-[44px] touch-manipulation select-none
         transition-all duration-150
@@ -69,6 +105,31 @@ export function PieceCard({
         className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl"
         style={{ backgroundColor: projectColor }}
       />
+
+      {/* Delete button — top-right, opacity bumps on hover/focus.
+          Discrete on iPad too: stays at 30% so it's always tappable. */}
+      {!isOverlay && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          onPointerDown={handleDeletePointerDown}
+          disabled={isDeleting}
+          className="absolute top-1 right-1 z-10 w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 opacity-30 group-hover:opacity-100 focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
+          title="Eliminar peça definitivamente"
+          aria-label={`Eliminar peça ${piece.reference}`}
+        >
+          {isDeleting ? (
+            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          )}
+        </button>
+      )}
 
       <div className="pl-4 pr-3 py-3">
         {/* Row 1: Reference + urgency + program status */}
