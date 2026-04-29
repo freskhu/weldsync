@@ -213,15 +213,47 @@ export async function getAllPieceCounts(): Promise<Map<string, number>> {
 
 /**
  * Returns all pieces across all projects.
+ *
+ * Ordering: priority ASC NULLS LAST first (so the "Programada" kanban column
+ * comes back in user-defined order), then created_at ASC as a stable tie
+ * breaker for everything else.
  */
 export async function getAllPieces(): Promise<Piece[]> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("piece")
     .select("*")
+    .order("priority", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (error) throw new Error(`getAllPieces: ${error.message}`);
   return data ?? [];
+}
+
+/**
+ * Resolves a set of auth.users ids to display names via the
+ * `get_user_display_names` SECURITY DEFINER RPC. Returns an empty map on
+ * error or empty input — never throws (audit footer is non-critical UX).
+ */
+export async function getUserDisplayNames(
+  ids: string[]
+): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (unique.length === 0) return {};
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("get_user_display_names", {
+    ids: unique,
+  });
+  if (error) {
+    console.error("[getUserDisplayNames] rpc failed:", error.message);
+    return {};
+  }
+
+  const map: Record<string, string> = {};
+  for (const row of (data ?? []) as { id: string; display_name: string }[]) {
+    if (row.id && row.display_name) map[row.id] = row.display_name;
+  }
+  return map;
 }
 
 /**
@@ -232,6 +264,79 @@ export async function movePiece(
   newStatus: Piece["status"]
 ): Promise<Piece | null> {
   return updatePiece(pieceId, { status: newStatus });
+}
+
+/**
+ * Returns the next priority slot for the "programmed" column.
+ * MAX(priority)+1, or 1 if the column is empty.
+ *
+ * NOTE: not transactionally atomic — two concurrent inserts could race and
+ * land on the same priority. Acceptable for this UX (single planner, low
+ * concurrency); revisit with an RPC + advisory lock if it ever matters.
+ */
+export async function nextProgrammedPriority(): Promise<number> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("priority")
+    .eq("status", "programmed")
+    .not("priority", "is", null)
+    .order("priority", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`nextProgrammedPriority: ${error.message}`);
+  const max = data?.priority ?? 0;
+  return max + 1;
+}
+
+/**
+ * Returns the immediate neighbour of `piece` in the programmed column,
+ * either above (smaller priority) or below (larger priority). Null if the
+ * piece is already at the boundary.
+ */
+export async function getProgrammedNeighbour(
+  pieceId: string,
+  direction: "up" | "down"
+): Promise<Piece | null> {
+  const target = await getPieceById(pieceId);
+  if (!target || target.status !== "programmed" || target.priority == null) {
+    return null;
+  }
+  const supabase = await createServerSupabaseClient();
+  const query = supabase
+    .from("piece")
+    .select("*")
+    .eq("status", "programmed")
+    .not("priority", "is", null);
+
+  if (direction === "up") {
+    query.lt("priority", target.priority).order("priority", { ascending: false });
+  } else {
+    query.gt("priority", target.priority).order("priority", { ascending: true });
+  }
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) throw new Error(`getProgrammedNeighbour: ${error.message}`);
+  return data;
+}
+
+/**
+ * Atomically swaps the `priority` field between two pieces. Implemented as
+ * two sequential UPDATEs since `priority` has no UNIQUE constraint, so a
+ * temporary "duplicate" between the two writes is harmless.
+ *
+ * Returns both pieces with their new priorities, or null if either was not
+ * found / not programmed.
+ */
+export async function swapProgrammedPriorities(
+  pieceA: Piece,
+  pieceB: Piece
+): Promise<{ a: Piece; b: Piece } | null> {
+  if (pieceA.priority == null || pieceB.priority == null) return null;
+  const a = await updatePiece(pieceA.id, { priority: pieceB.priority });
+  if (!a) return null;
+  const b = await updatePiece(pieceB.id, { priority: pieceA.priority });
+  if (!b) return null;
+  return { a, b };
 }
 
 // --- Allocation ---

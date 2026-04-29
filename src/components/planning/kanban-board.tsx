@@ -17,6 +17,8 @@ import type { Piece, PieceStatus, Robot } from "@/lib/types";
 import {
   movePieceAction,
   deallocatePieceAction,
+  movePieceUpAction,
+  movePieceDownAction,
 } from "@/app/actions/piece-actions";
 import { KanbanColumn } from "./kanban-column";
 import { PieceCard } from "./piece-card";
@@ -36,6 +38,8 @@ interface KanbanBoardProps {
   projectMap: Record<string, { name: string; color: string }>;
   robotMap: Record<number, string>;
   robots: Robot[];
+  /** auth.users.id -> display name. Used by piece-card audit footer. */
+  userMap: Record<string, string>;
 }
 
 export function KanbanBoard({
@@ -43,6 +47,7 @@ export function KanbanBoard({
   projectMap,
   robotMap,
   robots,
+  userMap,
 }: KanbanBoardProps) {
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -122,7 +127,9 @@ export function KanbanBoard({
     });
   }, [filteredPieces]);
 
-  // Group by status
+  // Group by status. The "programmed" column is re-sorted by `priority` ASC
+  // (NULLS LAST) — overrides the urgent/deadline ordering used everywhere else
+  // because this column is explicitly user-ranked via the ▲▼ arrows.
   const columnPieces = useMemo(() => {
     const map: Record<PieceStatus, Piece[]> = {
       backlog: [],
@@ -135,6 +142,14 @@ export function KanbanBoard({
     for (const piece of sortedPieces) {
       map[piece.status].push(piece);
     }
+    map.programmed.sort((a, b) => {
+      const pa = a.priority;
+      const pb = b.priority;
+      if (pa == null && pb == null) return 0;
+      if (pa == null) return 1; // NULLS LAST
+      if (pb == null) return -1;
+      return pa - pb;
+    });
     return map;
   }, [sortedPieces]);
 
@@ -319,6 +334,64 @@ export function KanbanBoard({
     setPieces((prev) => prev.filter((p) => p.id !== pieceId));
   }, []);
 
+  /**
+   * Reorder a piece up/down within the "programmed" column.
+   * Optimistic: swap priority locally, then call the server. Revert on failure.
+   * The server is the source of truth for the actual numeric values, but the
+   * relative order is what the user cares about — so swapping locally is safe.
+   */
+  const handleReorder = useCallback(
+    async (pieceId: string, direction: "up" | "down") => {
+      const target = pieces.find((p) => p.id === pieceId);
+      if (!target || target.status !== "programmed") return;
+      if (target.priority == null) {
+        // No local swap possible — just hit the server (it will backfill).
+        const result =
+          direction === "up"
+            ? await movePieceUpAction(pieceId)
+            : await movePieceDownAction(pieceId);
+        if (!result.success) {
+          console.error("Failed to reorder piece:", result.error);
+        }
+        return;
+      }
+
+      // Find neighbour in the sorted programmed column.
+      const programmed = pieces
+        .filter(
+          (p) => p.status === "programmed" && p.priority != null
+        )
+        .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+      const idx = programmed.findIndex((p) => p.id === pieceId);
+      if (idx === -1) return;
+      const neighbourIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (neighbourIdx < 0 || neighbourIdx >= programmed.length) return; // boundary
+      const neighbour = programmed[neighbourIdx];
+      if (neighbour.priority == null) return;
+
+      const previousPieces = [...pieces];
+      const targetPriority = target.priority;
+      const neighbourPriority = neighbour.priority;
+      setPieces((prev) =>
+        prev.map((p) => {
+          if (p.id === target.id) return { ...p, priority: neighbourPriority };
+          if (p.id === neighbour.id) return { ...p, priority: targetPriority };
+          return p;
+        })
+      );
+
+      const result =
+        direction === "up"
+          ? await movePieceUpAction(pieceId)
+          : await movePieceDownAction(pieceId);
+      if (!result.success) {
+        setPieces(previousPieces);
+        console.error("Failed to reorder piece:", result.error);
+      }
+    },
+    [pieces]
+  );
+
   const hasFilters = !!(filterProject || filterRobot || filterUrgent);
 
   return (
@@ -356,19 +429,41 @@ export function KanbanBoard({
               count={columnPieces[col.id].length}
               isOver={overId === col.id}
             >
-              {columnPieces[col.id].map((piece) => (
-                <PieceCard
-                  key={piece.id}
-                  piece={piece}
-                  projectName={projectMap[piece.project_id]?.name ?? "—"}
-                  projectColor={projectMap[piece.project_id]?.color ?? "#6B7280"}
-                  robotName={
-                    piece.robot_id ? robotMap[piece.robot_id] ?? null : null
-                  }
-                  isDragging={activeId === piece.id}
-                  onDeleted={handleDeletePiece}
-                />
-              ))}
+              {columnPieces[col.id].map((piece, idx, arr) => {
+                const isProgrammed = col.id === "programmed";
+                const changedByName = piece.last_status_change_by
+                  ? userMap[piece.last_status_change_by] ?? null
+                  : null;
+                return (
+                  <PieceCard
+                    key={piece.id}
+                    piece={piece}
+                    projectName={projectMap[piece.project_id]?.name ?? "—"}
+                    projectColor={
+                      projectMap[piece.project_id]?.color ?? "#6B7280"
+                    }
+                    robotName={
+                      piece.robot_id ? robotMap[piece.robot_id] ?? null : null
+                    }
+                    isDragging={activeId === piece.id}
+                    onDeleted={handleDeletePiece}
+                    showReorderArrows={isProgrammed}
+                    canMoveUp={isProgrammed && idx > 0}
+                    canMoveDown={isProgrammed && idx < arr.length - 1}
+                    onMoveUp={
+                      isProgrammed
+                        ? () => handleReorder(piece.id, "up")
+                        : undefined
+                    }
+                    onMoveDown={
+                      isProgrammed
+                        ? () => handleReorder(piece.id, "down")
+                        : undefined
+                    }
+                    changedByName={changedByName}
+                  />
+                );
+              })}
             </KanbanColumn>
           ))}
         </div>

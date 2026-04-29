@@ -52,3 +52,21 @@ export async function logAudit(
     });
   }
 }
+
+/**
+ * Returns the current authenticated user's id, or null if no session.
+ * Wrapped with try/catch to mirror logAudit semantics — never throws,
+ * caller can safely use the result without guarding.
+ */
+export async function getCurrentUserId(
+  supabase: SupabaseClient
+): Promise<string | null> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}

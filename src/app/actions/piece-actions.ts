@@ -13,16 +13,16 @@ import {
   deletePiece as dbDeletePiece,
   getPieceByReference,
   getPieceById,
-  movePiece as dbMovePiece,
   linkProgram as dbLinkProgram,
   unlinkProgram as dbUnlinkProgram,
-  allocatePiece as dbAllocatePiece,
-  deallocatePiece as dbDeallocatePiece,
   PieceOverlapError,
+  nextProgrammedPriority,
+  getProgrammedNeighbour,
+  swapProgrammedPriorities,
 } from "@/lib/data/store";
-import type { PieceStatus } from "@/lib/types";
+import type { Piece, PieceStatus } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
-import { logAudit } from "@/lib/audit";
+import { logAudit, getCurrentUserId } from "@/lib/audit";
 
 const PIECE_OVERLAP_MESSAGE =
   "Esta peça sobrepõe-se a outra já planeada no mesmo robot.";
@@ -44,6 +44,17 @@ function parsePiecePeriod(
 ): "morning" | "afternoon" | null {
   if (val !== "morning" && val !== "afternoon") return null;
   return val;
+}
+
+/**
+ * Builds the audit fields injected on every status-changing mutation.
+ * Centralized so that all entry/exit paths to "programmed" stay consistent.
+ */
+function statusAuditPatch(userId: string | null) {
+  return {
+    last_status_change_by: userId,
+    last_status_change_at: new Date().toISOString(),
+  };
 }
 
 export async function createPieceAction(
@@ -98,6 +109,13 @@ export async function createPieceAction(
     };
   }
 
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  // If creating directly into "programmed", grab the next priority slot.
+  const priority =
+    result.data.status === "programmed" ? await nextProgrammedPriority() : null;
+
   let created;
   try {
     created = await dbCreatePiece({
@@ -121,6 +139,9 @@ export async function createPieceAction(
       barcode: result.data.barcode ?? null,
       program_id: null,
       position: null,
+      priority,
+      last_status_change_by: userId,
+      last_status_change_at: new Date().toISOString(),
     });
   } catch (err) {
     if (err instanceof PieceOverlapError) {
@@ -130,7 +151,6 @@ export async function createPieceAction(
   }
 
   if (created) {
-    const supabase = await createClient();
     await logAudit(supabase, "INSERT", "piece", created.id, null, created);
   }
 
@@ -239,6 +259,18 @@ const VALID_STATUSES: PieceStatus[] = [
   "completed",
 ];
 
+/**
+ * Generic move action used by the kanban board for status transitions
+ * EXCEPT "programmed" (which goes through programPieceWithRobotAction)
+ * and "allocated" (which goes through allocatePieceAction).
+ *
+ * Centralizes:
+ *   - audit fields (last_status_change_by/at)
+ *   - priority lifecycle (cleared on exit from programmed; assigned via
+ *     programPieceWithRobotAction on entry)
+ *   - calendar/robot cleanup on "completed"
+ *   - calendar/robot cleanup on move out of "allocated" (back to backlog/planned)
+ */
 export async function movePieceAction(
   pieceId: string,
   newStatus: PieceStatus
@@ -251,24 +283,49 @@ export async function movePieceAction(
   const before = await getPieceById(pieceId);
   if (!before) return { success: false, error: "Peca nao encontrada." };
 
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  // Build the patch incrementally based on transition.
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    status: newStatus,
+    ...statusAuditPatch(userId),
+  };
+
+  // Leaving "programmed" -> clear priority slot.
+  if (before.status === "programmed" && newStatus !== "programmed") {
+    patch.priority = null;
+  }
+
+  // Entering "programmed" via this generic action (rare — usually goes
+  // through programPieceWithRobotAction). Assign next slot if not already set.
+  if (before.status !== "programmed" && newStatus === "programmed") {
+    patch.priority = await nextProgrammedPriority();
+  }
+
+  // "completed" drops the piece off the calendar AND off the robot.
+  if (newStatus === "completed") {
+    patch.planned_start_date = null;
+    patch.planned_end_date = null;
+    patch.planned_start_period = null;
+    patch.planned_end_period = null;
+    patch.robot_id = null;
+    patch.scheduled_date = null;
+    patch.scheduled_period = null;
+  }
+
+  // Moving OUT of "allocated" frees the calendar slot.
+  if (before.status === "allocated" && newStatus !== "allocated") {
+    patch.scheduled_date = null;
+    patch.scheduled_period = null;
+    if (newStatus === "backlog" || newStatus === "planned") {
+      patch.robot_id = null;
+    }
+  }
+
   let piece;
   try {
-    if (newStatus === "completed") {
-      // Drop to "Finalizados" — clear calendar slot + robot atomically.
-      // The piece must leave the calendar and free the robot when finished.
-      piece = await dbUpdatePiece(pieceId, {
-        status: "completed",
-        planned_start_date: null,
-        planned_end_date: null,
-        planned_start_period: null,
-        planned_end_period: null,
-        robot_id: null,
-        scheduled_date: null,
-        scheduled_period: null,
-      });
-    } else {
-      piece = await dbMovePiece(pieceId, newStatus);
-    }
+    piece = await dbUpdatePiece(pieceId, patch);
   } catch (err) {
     if (err instanceof PieceOverlapError) {
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
@@ -277,7 +334,6 @@ export async function movePieceAction(
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
-  const supabase = await createClient();
   await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
@@ -375,28 +431,12 @@ export async function allocatePieceAction(
     return { success: false, fieldErrors };
   }
 
-  const { pieceId, robotId, date, period } = result.data;
-
-  const before = await getPieceById(pieceId);
-  if (!before) return { success: false, error: "Peca nao encontrada." };
-
-  let piece;
-  try {
-    piece = await dbAllocatePiece(pieceId, robotId, date, period);
-  } catch (err) {
-    if (err instanceof PieceOverlapError) {
-      return { success: false, error: PIECE_OVERLAP_MESSAGE };
-    }
-    throw err;
-  }
-  if (!piece) return { success: false, error: "Peca nao encontrada." };
-
-  const supabase = await createClient();
-  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
-
-  revalidatePath("/planning");
-  revalidatePath("/robots");
-  return { success: true };
+  return allocatePieceCore(
+    result.data.pieceId,
+    result.data.robotId,
+    result.data.date,
+    result.data.period
+  );
 }
 
 /**
@@ -420,17 +460,42 @@ export async function allocatePieceDirectAction(
     return { success: false, fieldErrors };
   }
 
-  const before = await getPieceById(result.data.pieceId);
+  return allocatePieceCore(
+    result.data.pieceId,
+    result.data.robotId,
+    result.data.date,
+    result.data.period
+  );
+}
+
+/**
+ * Shared allocation pipeline. Sets status='allocated', clears priority if the
+ * piece was in "programmed", and stamps the audit fields.
+ */
+async function allocatePieceCore(
+  pieceId: string,
+  robotId: number,
+  date: string,
+  period: "AM" | "PM"
+): Promise<ActionResult> {
+  const before = await getPieceById(pieceId);
   if (!before) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    status: "allocated",
+    robot_id: robotId,
+    scheduled_date: date,
+    scheduled_period: period,
+    ...statusAuditPatch(userId),
+  };
+  if (before.status === "programmed") patch.priority = null;
 
   let piece;
   try {
-    piece = await dbAllocatePiece(
-      result.data.pieceId,
-      result.data.robotId,
-      result.data.date,
-      result.data.period
-    );
+    piece = await dbUpdatePiece(pieceId, patch);
   } catch (err) {
     if (err instanceof PieceOverlapError) {
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
@@ -439,8 +504,7 @@ export async function allocatePieceDirectAction(
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
-  const supabase = await createClient();
-  await logAudit(supabase, "UPDATE", "piece", result.data.pieceId, before, piece);
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/calendar");
   revalidatePath("/planning");
@@ -457,10 +521,19 @@ export async function deallocatePieceAction(
   const before = await getPieceById(pieceId);
   if (!before) return { success: false, error: "Peca nao encontrada." };
 
-  const piece = await dbDeallocatePiece(pieceId);
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  const piece = await dbUpdatePiece(pieceId, {
+    status: "backlog",
+    robot_id: null,
+    scheduled_date: null,
+    scheduled_period: null,
+    priority: null,
+    ...statusAuditPatch(userId),
+  });
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
-  const supabase = await createClient();
   await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
@@ -472,6 +545,9 @@ export async function deallocatePieceAction(
  * Atomically sets a piece's status to "programmed" and assigns a robot_id.
  * Used by the kanban "Programada" column drop flow — the user picks which
  * robot was programmed and we persist both fields in one UPDATE.
+ *
+ * Assigns the next priority slot (MAX+1) only when entering programmed for
+ * the first time. Re-running on an already-programmed piece keeps the slot.
  *
  * Does NOT touch dates (planned_*, scheduled_*). Robot picker is purely a
  * "which station did this get programmed on" record.
@@ -488,12 +564,22 @@ export async function programPieceWithRobotAction(
   const before = await getPieceById(pieceId);
   if (!before) return { success: false, error: "Peca nao encontrada." };
 
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    status: "programmed",
+    robot_id: robotId,
+    ...statusAuditPatch(userId),
+  };
+  // Only assign a fresh slot if the piece is entering programmed.
+  if (before.status !== "programmed" || before.priority == null) {
+    patch.priority = await nextProgrammedPriority();
+  }
+
   let piece;
   try {
-    piece = await dbUpdatePiece(pieceId, {
-      status: "programmed",
-      robot_id: robotId,
-    });
+    piece = await dbUpdatePiece(pieceId, patch);
   } catch (err) {
     if (err instanceof PieceOverlapError) {
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
@@ -502,13 +588,61 @@ export async function programPieceWithRobotAction(
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
-  const supabase = await createClient();
   await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
   revalidatePath("/calendar");
   revalidatePath("/robots");
   return { success: true };
+}
+
+// --- Programmed priority reorder (▲▼ arrows on Programada column) ---
+
+async function reorderProgrammed(
+  pieceId: string,
+  direction: "up" | "down"
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+
+  const target = await getPieceById(pieceId);
+  if (!target) return { success: false, error: "Peca nao encontrada." };
+  if (target.status !== "programmed") {
+    return { success: false, error: "Peca nao esta na coluna Programada." };
+  }
+  if (target.priority == null) {
+    // Backfill: piece is programmed but has no slot. Assign one and stop —
+    // there's nothing to swap with yet.
+    await dbUpdatePiece(pieceId, { priority: await nextProgrammedPriority() });
+    revalidatePath("/planning");
+    return { success: true };
+  }
+
+  const neighbour = await getProgrammedNeighbour(pieceId, direction);
+  // No-op at boundary — succeed silently so the optimistic UI reverts cleanly.
+  if (!neighbour) {
+    revalidatePath("/planning");
+    return { success: true };
+  }
+
+  const swapped = await swapProgrammedPriorities(target, neighbour);
+  if (!swapped) {
+    return { success: false, error: "Falha ao reordenar." };
+  }
+
+  revalidatePath("/planning");
+  return { success: true };
+}
+
+export async function movePieceUpAction(
+  pieceId: string
+): Promise<ActionResult> {
+  return reorderProgrammed(pieceId, "up");
+}
+
+export async function movePieceDownAction(
+  pieceId: string
+): Promise<ActionResult> {
+  return reorderProgrammed(pieceId, "down");
 }
 
 // --- Planned range (span block) actions ---
@@ -634,3 +768,6 @@ export async function clearPlannedRangeAction(
   revalidatePath("/robots");
   return { success: true };
 }
+
+// Re-export Piece type for callers that import alongside actions.
+export type { Piece };

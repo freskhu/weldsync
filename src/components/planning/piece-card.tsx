@@ -14,6 +14,16 @@ interface PieceCardProps {
   isOverlay?: boolean;
   /** Called after the piece is successfully deleted on the server. */
   onDeleted?: (pieceId: string) => void;
+  /** Show ▲▼ priority arrows. True only on the "programmed" column. */
+  showReorderArrows?: boolean;
+  /** Disable ▲ at the top of the column. */
+  canMoveUp?: boolean;
+  /** Disable ▼ at the bottom of the column. */
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  /** Display name of the user who last changed the piece status. */
+  changedByName?: string | null;
 }
 
 function getDeadlineInfo(deadline: string | null): {
@@ -44,6 +54,12 @@ export function PieceCard({
   isDragging = false,
   isOverlay = false,
   onDeleted,
+  showReorderArrows = false,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
+  changedByName,
 }: PieceCardProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: piece.id,
@@ -86,6 +102,39 @@ export function PieceCard({
     e.stopPropagation();
   }
 
+  function handleReorderClick(
+    e: React.MouseEvent<HTMLButtonElement>,
+    direction: "up" | "down"
+  ) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isOverlay) return;
+    if (direction === "up") {
+      onMoveUp?.();
+    } else {
+      onMoveDown?.();
+    }
+  }
+
+  function handleReorderPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    // Same reason as the delete button: keep dnd-kit's MouseSensor from
+    // hijacking the click. Without this the arrow tap starts a drag instead.
+    e.stopPropagation();
+  }
+
+  // Footer shown only on programmed cards: who last changed status and when.
+  const showAuditFooter =
+    piece.status === "programmed" &&
+    !isOverlay &&
+    !!piece.last_status_change_at;
+  const auditDate = piece.last_status_change_at
+    ? new Date(piece.last_status_change_at).toLocaleDateString("pt-PT", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : null;
+
   return (
     <div
       ref={!isOverlay ? setNodeRef : undefined}
@@ -105,6 +154,40 @@ export function PieceCard({
         className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl"
         style={{ backgroundColor: projectColor }}
       />
+
+      {/* Reorder arrows — top-left, programmed column only. Hidden until
+          hover/focus; touch devices reveal them via the column's :focus-within
+          fallback. Stacked vertically to keep the tap target above 24px each. */}
+      {showReorderArrows && !isOverlay && (
+        <div className="absolute top-1 left-2 z-10 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={(e) => handleReorderClick(e, "up")}
+            onPointerDown={handleReorderPointerDown}
+            disabled={!canMoveUp}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-[var(--color-ink)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            title="Subir prioridade"
+            aria-label={`Subir prioridade da peça ${piece.reference}`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => handleReorderClick(e, "down")}
+            onPointerDown={handleReorderPointerDown}
+            disabled={!canMoveDown}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-[var(--color-ink)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            title="Descer prioridade"
+            aria-label={`Descer prioridade da peça ${piece.reference}`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Delete button — top-right, opacity bumps on hover/focus.
           Discrete on iPad too: stays at 30% so it's always tappable. */}
@@ -205,6 +288,19 @@ export function PieceCard({
             </span>
           )}
         </div>
+
+        {/* Audit footer — programmed column only. Shows who last moved the
+            piece and the date of that change. Falls back to "—" when the
+            display name is unknown (user deleted, RPC missing, etc). */}
+        {showAuditFooter && auditDate && (
+          <div
+            className="mt-2 pt-1.5 text-[10px] truncate"
+            style={{ color: 'var(--color-ink-mute)', borderTop: '1px solid var(--color-line-soft)' }}
+            title={`Última mudança de estado por ${changedByName ?? "—"} a ${auditDate}`}
+          >
+            {changedByName ?? "—"} · {auditDate}
+          </div>
+        )}
       </div>
     </div>
   );
