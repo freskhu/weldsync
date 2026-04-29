@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { planningWindowUpdateSchema } from "@/lib/validations/planning-window";
-import { updateActivePlanningWindow } from "@/lib/data/planning-window";
+import {
+  getActivePlanningWindow,
+  updateActivePlanningWindow,
+} from "@/lib/data/planning-window";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 export type PlanningWindowActionState = {
   success?: boolean;
@@ -31,6 +36,7 @@ export async function updatePlanningWindowAction(
   }
 
   try {
+    const before = await getActivePlanningWindow();
     const updated = await updateActivePlanningWindow({
       start_date: result.data.start_date,
       end_date: result.data.end_date,
@@ -42,6 +48,17 @@ export async function updatePlanningWindowAction(
           "Nenhuma janela activa encontrada. Aplica a migration 00005_create_planning_window no Supabase.",
       };
     }
+
+    const supabase = await createServerSupabaseClient();
+    await logAudit(
+      supabase,
+      "UPDATE",
+      "planning_window",
+      String(updated.id),
+      before,
+      updated
+    );
+
     revalidatePath("/planning");
     revalidatePath("/calendar");
     revalidatePath("/dashboard");

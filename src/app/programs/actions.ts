@@ -7,8 +7,10 @@ import {
   createProgram,
   updateProgram,
   deleteProgram,
+  getProgramById,
 } from "@/lib/data/programs";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 // ---------------------------------------------------------------------------
 // Types for form state
@@ -94,7 +96,8 @@ export async function uploadProgramAction(
   const fileUrl = urlData.publicUrl;
 
   try {
-    await createProgram(parsed.data, fileUrl);
+    const created = await createProgram(parsed.data, fileUrl);
+    await logAudit(supabase, "INSERT", "program", created.id, null, created);
   } catch {
     // Clean up uploaded file on DB insert failure
     await supabase.storage.from("programs").remove([uploadData.path]);
@@ -138,10 +141,14 @@ export async function updateProgramAction(
     return { success: false, error: "Dados invalidos", fieldErrors };
   }
 
+  const before = await getProgramById(id);
   const updated = await updateProgram(id, parsed.data);
   if (!updated) {
     return { success: false, error: "Programa nao encontrado" };
   }
+
+  const supabase = await createServerSupabaseClient();
+  await logAudit(supabase, "UPDATE", "program", id, before, updated);
 
   revalidatePath("/programs");
   revalidatePath(`/programs/${id}`);
@@ -153,10 +160,14 @@ export async function updateProgramAction(
 // ---------------------------------------------------------------------------
 
 export async function deleteProgramAction(id: string): Promise<ActionState> {
+  const before = await getProgramById(id);
   const deleted = await deleteProgram(id);
   if (!deleted) {
     return { success: false, error: "Programa nao encontrado" };
   }
+
+  const supabase = await createServerSupabaseClient();
+  await logAudit(supabase, "DELETE", "program", id, before, null);
 
   revalidatePath("/programs");
   redirect("/programs");

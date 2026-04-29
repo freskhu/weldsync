@@ -112,7 +112,12 @@ function LogoMark() {
   );
 }
 
-export function Sidebar() {
+export type SidebarUser = {
+  email: string | null;
+  name: string | null;
+} | null;
+
+export function Sidebar({ user }: { user?: SidebarUser }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -127,6 +132,14 @@ export function Sidebar() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Hide chrome on auth pages — they render fullscreen.
+  if (pathname === "/login" || pathname.startsWith("/auth/")) {
+    return null;
+  }
+
+  const userLabel = user?.name || user?.email || null;
+  const userInitial = userLabel ? userLabel.charAt(0).toUpperCase() : "?";
 
   return (
     <>
@@ -172,6 +185,41 @@ export function Sidebar() {
         <nav className="p-4">
           <NavList pathname={pathname} />
         </nav>
+        {userLabel && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
+            <div className="flex items-center gap-3 px-1">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #FDAB3D, #E2445C)' }}
+              >
+                {userInitial}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[13px] font-semibold text-white block leading-tight truncate" title={userLabel}>
+                  {user?.name || "Utilizador"}
+                </span>
+                {user?.email && (
+                  <span className="text-[11px] text-[#9699A6] block truncate" title={user.email}>
+                    {user.email}
+                  </span>
+                )}
+              </div>
+              <form action="/auth/signout" method="post" className="flex-shrink-0">
+                <button
+                  type="submit"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[#C5C9DE] hover:text-white hover:bg-white/10 touch-manipulation"
+                  aria-label="Sair"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* Desktop sidebar */}
@@ -185,17 +233,52 @@ export function Sidebar() {
         <nav className="flex-1 p-4">
           <NavList pathname={pathname} />
         </nav>
-        {/* Bottom section */}
+        {/* Bottom section: signed-in user + sign out */}
         <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, #FDAB3D, #E2445C)' }}>
-              CM
+          {userLabel ? (
+            <div className="flex items-center gap-3 px-1">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #FDAB3D, #E2445C)' }}
+              >
+                {userInitial}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[13px] font-semibold text-white block leading-tight truncate" title={userLabel}>
+                  {user?.name || "Utilizador"}
+                </span>
+                {user?.email && (
+                  <span className="text-[11px] text-[#9699A6] block truncate" title={user.email}>
+                    {user.email}
+                  </span>
+                )}
+              </div>
+              <form action="/auth/signout" method="post" className="flex-shrink-0">
+                <button
+                  type="submit"
+                  className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md text-[#C5C9DE] hover:text-white hover:bg-white/10 touch-manipulation"
+                  aria-label="Sair"
+                  title="Sair"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </button>
+              </form>
             </div>
-            <div>
-              <span className="text-[13px] font-semibold text-white block leading-tight">Curval</span>
-              <span className="text-[11px] text-[#9699A6]">Metalworks</span>
+          ) : (
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, #FDAB3D, #E2445C)' }}>
+                CM
+              </div>
+              <div>
+                <span className="text-[13px] font-semibold text-white block leading-tight">Curval</span>
+                <span className="text-[11px] text-[#9699A6]">Metalworks</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </aside>
     </>

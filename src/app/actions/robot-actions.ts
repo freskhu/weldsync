@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createRobot, updateRobot, deleteRobot } from "@/lib/data/store";
+import {
+  createRobot,
+  updateRobot,
+  deleteRobot,
+  getRobotById,
+} from "@/lib/data/store";
 import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 const robotSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(100),
@@ -40,13 +47,24 @@ export async function createRobotAction(
     : [];
 
   try {
-    await createRobot({
+    const created = await createRobot({
       name: result.data.name,
       description: result.data.description ?? null,
       capacity_kg: result.data.capacity_kg,
       setup_type: result.data.setup_type,
       capabilities,
     });
+    if (created) {
+      const supabase = await createClient();
+      await logAudit(
+        supabase,
+        "INSERT",
+        "robot",
+        String(created.id),
+        null,
+        created
+      );
+    }
     revalidatePath("/robots");
     revalidatePath("/planning");
     revalidatePath("/calendar");
@@ -81,13 +99,18 @@ export async function updateRobotAction(
     : [];
 
   try {
-    await updateRobot(id, {
+    const before = await getRobotById(id);
+    const updated = await updateRobot(id, {
       name: result.data.name,
       description: result.data.description ?? null,
       capacity_kg: result.data.capacity_kg,
       setup_type: result.data.setup_type,
       capabilities,
     });
+    if (updated) {
+      const supabase = await createClient();
+      await logAudit(supabase, "UPDATE", "robot", String(id), before, updated);
+    }
     revalidatePath("/robots");
     revalidatePath("/planning");
     revalidatePath("/calendar");
@@ -99,7 +122,12 @@ export async function updateRobotAction(
 
 export async function deleteRobotAction(robotId: number): Promise<RobotActionState> {
   try {
+    const before = await getRobotById(robotId);
     await deleteRobot(robotId);
+    if (before) {
+      const supabase = await createClient();
+      await logAudit(supabase, "DELETE", "robot", String(robotId), before, null);
+    }
     revalidatePath("/robots");
     revalidatePath("/planning");
     revalidatePath("/calendar");

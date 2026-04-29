@@ -10,6 +10,8 @@ import {
   getProjectByClientRef,
   getProjectById,
 } from "@/lib/data/store";
+import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 export type ActionResult = {
   success: boolean;
@@ -55,7 +57,7 @@ export async function createProjectAction(
     };
   }
 
-  await dbCreateProject({
+  const created = await dbCreateProject({
     client_ref: result.data.client_ref,
     name: result.data.name,
     client_name: result.data.client_name,
@@ -66,6 +68,11 @@ export async function createProjectAction(
     status: result.data.status,
     notes: result.data.notes ?? null,
   });
+
+  if (created) {
+    const supabase = await createClient();
+    await logAudit(supabase, "INSERT", "project", created.id, null, created);
+  }
 
   revalidatePath("/projects");
   redirect("/projects");
@@ -117,7 +124,7 @@ export async function updateProjectAction(
     }
   }
 
-  await dbUpdateProject(id, {
+  const updated = await dbUpdateProject(id, {
     ...(result.data.client_ref && { client_ref: result.data.client_ref }),
     ...(result.data.name && { name: result.data.name }),
     ...(result.data.client_name && { client_name: result.data.client_name }),
@@ -127,6 +134,11 @@ export async function updateProjectAction(
     end_date: result.data.end_date ?? null,
     notes: result.data.notes ?? null,
   });
+
+  if (updated) {
+    const supabase = await createClient();
+    await logAudit(supabase, "UPDATE", "project", id, project, updated);
+  }
 
   revalidatePath("/projects");
   revalidatePath(`/projects/${id}`);
@@ -139,8 +151,14 @@ export async function archiveProjectAction(
   const id = formData.get("id") as string;
   if (!id) return { success: false, error: "ID do projeto em falta." };
 
+  const before = await getProjectById(id);
+  if (!before) return { success: false, error: "Projeto nao encontrado." };
+
   const result = await dbArchiveProject(id);
   if (!result) return { success: false, error: "Projeto nao encontrado." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "project", id, before, result);
 
   revalidatePath("/projects");
   return { success: true };

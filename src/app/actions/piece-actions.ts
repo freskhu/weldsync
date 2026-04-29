@@ -21,6 +21,8 @@ import {
   PieceOverlapError,
 } from "@/lib/data/store";
 import type { PieceStatus } from "@/lib/types";
+import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 const PIECE_OVERLAP_MESSAGE =
   "Esta peça sobrepõe-se a outra já planeada no mesmo robot.";
@@ -96,8 +98,9 @@ export async function createPieceAction(
     };
   }
 
+  let created;
   try {
-    await dbCreatePiece({
+    created = await dbCreatePiece({
       project_id: result.data.project_id,
       reference: result.data.reference,
       description: result.data.description ?? null,
@@ -124,6 +127,11 @@ export async function createPieceAction(
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
     }
     throw err;
+  }
+
+  if (created) {
+    const supabase = await createClient();
+    await logAudit(supabase, "INSERT", "piece", created.id, null, created);
   }
 
   revalidatePath(`/projects/${projectId}`);
@@ -189,8 +197,9 @@ export async function updatePieceAction(
     }
   }
 
+  let updated;
   try {
-    await dbUpdatePiece(id, {
+    updated = await dbUpdatePiece(id, {
       ...(result.data.reference !== undefined && { reference: result.data.reference }),
       description: result.data.description ?? null,
       material: result.data.material ?? null,
@@ -210,6 +219,11 @@ export async function updatePieceAction(
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
     }
     throw err;
+  }
+
+  if (updated) {
+    const supabase = await createClient();
+    await logAudit(supabase, "UPDATE", "piece", id, piece, updated);
   }
 
   revalidatePath(`/projects/${projectId}`);
@@ -233,6 +247,9 @@ export async function movePieceAction(
   if (!VALID_STATUSES.includes(newStatus)) {
     return { success: false, error: "Estado invalido." };
   }
+
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
 
   let piece;
   try {
@@ -260,6 +277,9 @@ export async function movePieceAction(
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
+
   revalidatePath("/planning");
   revalidatePath("/calendar");
   revalidatePath("/robots");
@@ -274,8 +294,14 @@ export async function deletePieceAction(
 
   if (!id) return { success: false, error: "ID da peca em falta." };
 
+  const before = await getPieceById(id);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   const result = await dbDeletePiece(id);
   if (!result) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "DELETE", "piece", id, before, null);
 
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
@@ -288,8 +314,14 @@ export async function linkProgramToPiece(
   if (!pieceId) return { success: false, error: "ID da peca em falta." };
   if (!programId) return { success: false, error: "ID do programa em falta." };
 
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   const piece = await dbLinkProgram(pieceId, programId);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath(`/projects/${piece.project_id}`);
   return { success: true };
@@ -300,8 +332,14 @@ export async function unlinkProgramFromPiece(
 ): Promise<ActionResult> {
   if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   const piece = await dbUnlinkProgram(pieceId);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath(`/projects/${piece.project_id}`);
   return { success: true };
@@ -339,6 +377,9 @@ export async function allocatePieceAction(
 
   const { pieceId, robotId, date, period } = result.data;
 
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   let piece;
   try {
     piece = await dbAllocatePiece(pieceId, robotId, date, period);
@@ -349,6 +390,9 @@ export async function allocatePieceAction(
     throw err;
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
   revalidatePath("/robots");
@@ -376,6 +420,9 @@ export async function allocatePieceDirectAction(
     return { success: false, fieldErrors };
   }
 
+  const before = await getPieceById(result.data.pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   let piece;
   try {
     piece = await dbAllocatePiece(
@@ -392,6 +439,9 @@ export async function allocatePieceDirectAction(
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", result.data.pieceId, before, piece);
+
   revalidatePath("/calendar");
   revalidatePath("/planning");
   revalidatePath("/robots");
@@ -404,8 +454,14 @@ export async function deallocatePieceAction(
   const pieceId = formData.get("pieceId") as string;
   if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   const piece = await dbDeallocatePiece(pieceId);
   if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
   revalidatePath("/robots");
@@ -429,6 +485,9 @@ export async function programPieceWithRobotAction(
     return { success: false, error: "Robot invalido." };
   }
 
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   let piece;
   try {
     piece = await dbUpdatePiece(pieceId, {
@@ -442,6 +501,9 @@ export async function programPieceWithRobotAction(
     throw err;
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
   revalidatePath("/calendar");
@@ -509,6 +571,9 @@ export async function movePlannedRangeAction(input: {
     return { success: false, fieldErrors };
   }
 
+  const before = await getPieceById(result.data.pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   const patch: Parameters<typeof dbUpdatePiece>[1] = {
     planned_start_date: result.data.newStart,
     planned_end_date: result.data.newEnd,
@@ -530,6 +595,9 @@ export async function movePlannedRangeAction(input: {
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", result.data.pieceId, before, piece);
+
   revalidatePath("/planning");
   revalidatePath("/calendar");
   revalidatePath("/robots");
@@ -547,6 +615,9 @@ export async function clearPlannedRangeAction(
     return { success: false, error: "ID da peca em falta." };
   }
 
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
   const piece = await dbUpdatePiece(pieceId, {
     planned_start_date: null,
     planned_end_date: null,
@@ -554,6 +625,9 @@ export async function clearPlannedRangeAction(
     planned_end_period: null,
   });
   if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  const supabase = await createClient();
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
 
   revalidatePath("/planning");
   revalidatePath("/calendar");
