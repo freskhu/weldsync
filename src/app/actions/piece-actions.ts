@@ -366,13 +366,18 @@ export async function movePieceAction(
       console.error("[movePieceAction] logAudit threw (should never happen):", err instanceof Error ? err.message : String(err));
     }
 
-    try {
-      revalidatePath("/planning");
-      revalidatePath("/calendar");
-      revalidatePath("/robots");
-    } catch (err) {
-      console.error("[movePieceAction] revalidatePath failed:", err instanceof Error ? err.message : String(err));
-    }
+    // DEBUG: temporarily skip revalidatePath to isolate whether the
+    // Server Components render error originates from re-render of these
+    // routes. If drag persists after this commit, the issue is in
+    // revalidate; if it still fails the same way, look elsewhere.
+    console.log("[movePieceAction] skipping revalidatePath for debug");
+    // try {
+    //   revalidatePath("/planning");
+    //   revalidatePath("/calendar");
+    //   revalidatePath("/robots");
+    // } catch (err) {
+    //   console.error("[movePieceAction] revalidatePath failed:", err instanceof Error ? err.message : String(err));
+    // }
 
     return { success: true };
   } catch (err) {
