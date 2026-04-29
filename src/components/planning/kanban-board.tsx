@@ -287,10 +287,22 @@ export function KanbanBoard({
         if (!result.success) {
           setPieces(previousPieces);
           console.error("Failed to move piece:", result.error);
+          alert(
+            `[DEBUG] movePieceAction failed:\n\n${
+              result.error ?? "(sem mensagem)"
+            }\n\nFrom: ${piece.status}\nTo: ${targetStatus}`
+          );
         }
       } catch (err) {
         setPieces(previousPieces);
         console.error("movePieceAction threw:", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        const digest = (err as { digest?: string })?.digest;
+        alert(
+          `[DEBUG] movePieceAction THREW:\n\n${msg}${
+            digest ? `\n\ndigest: ${digest}` : ""
+          }\n\nFrom: ${piece.status}\nTo: ${targetStatus}`
+        );
       }
     },
     [pieces]
