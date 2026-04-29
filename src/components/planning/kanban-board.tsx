@@ -225,23 +225,31 @@ export function KanbanBoard({
           )
         );
 
-        // Deallocate first, then move to new status
-        const fd = new FormData();
-        fd.set("pieceId", pieceId);
-        const deallocResult = await deallocatePieceAction(fd);
-        if (!deallocResult.success) {
-          setPieces(previousPieces);
-          console.error("Failed to deallocate piece:", deallocResult.error);
-          return;
-        }
-
-        // If target is not backlog (deallocate sets backlog), move to actual target
-        if (targetStatus !== "backlog") {
-          const moveResult = await movePieceAction(pieceId, targetStatus);
-          if (!moveResult.success) {
+        // Deallocate first, then move to new status. Wrap in try/catch:
+        // server actions can throw (e.g. FK violation, RLS rejection) and
+        // without this the optimistic state would stick on the screen even
+        // though the DB never persisted -> "F5 brings it back" symptom.
+        try {
+          const fd = new FormData();
+          fd.set("pieceId", pieceId);
+          const deallocResult = await deallocatePieceAction(fd);
+          if (!deallocResult.success) {
             setPieces(previousPieces);
-            console.error("Failed to move piece:", moveResult.error);
+            console.error("Failed to deallocate piece:", deallocResult.error);
+            return;
           }
+
+          // If target is not backlog (deallocate sets backlog), move to actual target
+          if (targetStatus !== "backlog") {
+            const moveResult = await movePieceAction(pieceId, targetStatus);
+            if (!moveResult.success) {
+              setPieces(previousPieces);
+              console.error("Failed to move piece:", moveResult.error);
+            }
+          }
+        } catch (err) {
+          setPieces(previousPieces);
+          console.error("Drag move (deallocate path) threw:", err);
         }
         return;
       }
@@ -270,10 +278,19 @@ export function KanbanBoard({
         })
       );
 
-      const result = await movePieceAction(pieceId, targetStatus);
-      if (!result.success) {
+      // Guard against thrown server action errors (FK violations, RLS, network).
+      // Without try/catch the rejection bubbles up and the optimistic state
+      // stays on screen — user sees a "successful" move but a refresh reveals
+      // it never persisted.
+      try {
+        const result = await movePieceAction(pieceId, targetStatus);
+        if (!result.success) {
+          setPieces(previousPieces);
+          console.error("Failed to move piece:", result.error);
+        }
+      } catch (err) {
         setPieces(previousPieces);
-        console.error("Failed to move piece:", result.error);
+        console.error("movePieceAction threw:", err);
       }
     },
     [pieces]

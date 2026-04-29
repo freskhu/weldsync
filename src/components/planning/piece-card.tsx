@@ -119,16 +119,30 @@ export function PieceCard({
   function handleReorderPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     // Same reason as the delete button: keep dnd-kit's MouseSensor from
     // hijacking the click. Without this the arrow tap starts a drag instead.
+    // stopPropagation on both bubble and capture phase to be safe — dnd-kit's
+    // listener is attached on the parent, so capture-phase guarantees we
+    // beat it.
     e.stopPropagation();
   }
 
-  // Footer shown only on planned cards: who last changed status and when.
+  // Mouse/touch start handlers attached to the wrapper around the arrows.
+  // Capture phase ensures dnd-kit (which listens on the draggable parent in
+  // the bubble phase via React synthetic events) never sees the event.
+  function stopDndPointerDown(e: React.PointerEvent | React.MouseEvent | React.TouchEvent) {
+    e.stopPropagation();
+  }
+
+  // Footer shown on planned cards: who last moved the status and when.
+  // Fallback to updated_at when last_status_change_at is null (e.g. piece
+  // was moved by an action that pre-dates the audit feature, or the audit
+  // stamp failed to persist for whatever reason). Better to show the
+  // best-known timestamp than to render an empty footer.
+  const auditTimestamp =
+    piece.last_status_change_at ?? piece.updated_at ?? null;
   const showAuditFooter =
-    piece.status === "planned" &&
-    !isOverlay &&
-    !!piece.last_status_change_at;
-  const auditDate = piece.last_status_change_at
-    ? new Date(piece.last_status_change_at).toLocaleDateString("pt-PT", {
+    piece.status === "planned" && !isOverlay && !!auditTimestamp;
+  const auditDate = auditTimestamp
+    ? new Date(auditTimestamp).toLocaleDateString("pt-PT", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -155,63 +169,73 @@ export function PieceCard({
         style={{ backgroundColor: projectColor }}
       />
 
-      {/* Reorder arrows — top-left, planned column only. Hidden until
-          hover/focus; touch devices reveal them via the column's :focus-within
-          fallback. Stacked vertically to keep the tap target above 24px each. */}
-      {showReorderArrows && !isOverlay && (
-        <div className="absolute top-1 left-2 z-10 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+      {/* Action toolbar — top-right. Reorder arrows (planned column only)
+          sit to the LEFT of the delete button. Both stay visible on touch
+          devices; arrows use a solid blue chip so they're obvious on iPad
+          where there's no hover. The wrapper stops pointer events from
+          reaching dnd-kit's listener on the draggable parent (capture phase
+          + bubble) so taps register as clicks, not drag starts. */}
+      {!isOverlay && (
+        <div
+          className="absolute top-1 right-1 z-10 flex items-center gap-1"
+          onPointerDownCapture={stopDndPointerDown}
+          onMouseDownCapture={stopDndPointerDown}
+          onTouchStartCapture={stopDndPointerDown}
+          // Marker attribute for any future @dnd-kit configuration that
+          // wants to skip elements explicitly. Harmless on its own.
+          data-no-dnd="true"
+        >
+          {showReorderArrows && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => handleReorderClick(e, "up")}
+                onPointerDown={handleReorderPointerDown}
+                disabled={!canMoveUp}
+                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                title="Subir prioridade"
+                aria-label={`Subir prioridade da peça ${piece.reference}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => handleReorderClick(e, "down")}
+                onPointerDown={handleReorderPointerDown}
+                disabled={!canMoveDown}
+                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                title="Descer prioridade"
+                aria-label={`Descer prioridade da peça ${piece.reference}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </>
+          )}
           <button
             type="button"
-            onClick={(e) => handleReorderClick(e, "up")}
-            onPointerDown={handleReorderPointerDown}
-            disabled={!canMoveUp}
-            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-[var(--color-ink)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            title="Subir prioridade"
-            aria-label={`Subir prioridade da peça ${piece.reference}`}
+            onClick={handleDelete}
+            onPointerDown={handleDeletePointerDown}
+            disabled={isDeleting}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 opacity-40 group-hover:opacity-100 focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
+            title="Eliminar peça definitivamente"
+            aria-label={`Eliminar peça ${piece.reference}`}
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={(e) => handleReorderClick(e, "down")}
-            onPointerDown={handleReorderPointerDown}
-            disabled={!canMoveDown}
-            className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-[var(--color-ink)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            title="Descer prioridade"
-            aria-label={`Descer prioridade da peça ${piece.reference}`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            {isDeleting ? (
+              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            )}
           </button>
         </div>
-      )}
-
-      {/* Delete button — top-right, opacity bumps on hover/focus.
-          Discrete on iPad too: stays at 30% so it's always tappable. */}
-      {!isOverlay && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          onPointerDown={handleDeletePointerDown}
-          disabled={isDeleting}
-          className="absolute top-1 right-1 z-10 w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 opacity-30 group-hover:opacity-100 focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
-          title="Eliminar peça definitivamente"
-          aria-label={`Eliminar peça ${piece.reference}`}
-        >
-          {isDeleting ? (
-            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          )}
-        </button>
       )}
 
       <div className="pl-4 pr-3 py-3">

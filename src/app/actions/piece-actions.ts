@@ -329,7 +329,24 @@ export async function movePieceAction(
     if (err instanceof PieceOverlapError) {
       return { success: false, error: PIECE_OVERLAP_MESSAGE };
     }
-    throw err;
+    // Anything else (FK violation, RLS rejection, network, etc.) — log and
+    // return a non-throwing failure so the client reverts cleanly. Throwing
+    // out of a Server Action propagates to the caller as an unhandled
+    // rejection and the optimistic UI gets stuck.
+    console.error("[movePieceAction] dbUpdatePiece failed:", {
+      pieceId,
+      from: before.status,
+      to: newStatus,
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      success: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Não foi possível mover a peça.",
+    };
   }
   if (!piece) return { success: false, error: "Peca nao encontrada." };
 
