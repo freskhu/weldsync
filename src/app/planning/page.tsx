@@ -9,12 +9,39 @@ import { KanbanBoard } from "@/components/planning/kanban-board";
 import { PlanningWindowBar } from "@/components/planning/planning-window-bar";
 
 export default async function PlanningPage() {
-  const [pieces, projects, robots, planningWindow] = await Promise.all([
-    getAllPieces(),
-    getProjects(),
-    getRobots(),
-    getActivePlanningWindow(),
-  ]);
+  let pieces, projects, robots, planningWindow;
+  try {
+    pieces = await getAllPieces();
+  } catch (e) {
+    console.error("[planning/page] getAllPieces failed:", e);
+    throw new Error(
+      `getAllPieces: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  try {
+    projects = await getProjects();
+  } catch (e) {
+    console.error("[planning/page] getProjects failed:", e);
+    throw new Error(
+      `getProjects: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  try {
+    robots = await getRobots();
+  } catch (e) {
+    console.error("[planning/page] getRobots failed:", e);
+    throw new Error(
+      `getRobots: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  try {
+    planningWindow = await getActivePlanningWindow();
+  } catch (e) {
+    console.error("[planning/page] getActivePlanningWindow failed:", e);
+    throw new Error(
+      `getActivePlanningWindow: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
 
   // Build lookup maps for the client component
   const projectMap: Record<
@@ -39,7 +66,13 @@ export default async function PlanningPage() {
   const userIds = pieces
     .map((p) => p.last_status_change_by)
     .filter((id): id is string => !!id);
-  const userMap = await getUserDisplayNames(userIds);
+  let userMap: Record<string, string> = {};
+  try {
+    userMap = await getUserDisplayNames(userIds);
+  } catch (e) {
+    console.error("[planning/page] getUserDisplayNames failed:", e);
+    // fail-soft — empty map -> footer hides
+  }
 
   return (
     <div className="p-4 md:p-6 h-screen flex flex-col">
