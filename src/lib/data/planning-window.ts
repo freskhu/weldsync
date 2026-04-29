@@ -7,7 +7,7 @@
  */
 
 import type { PlanningWindow } from "@/lib/types";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * Returns the currently active planning window, or null if none exists.

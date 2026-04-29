@@ -4,7 +4,7 @@
  */
 
 import type { Project, Piece, Robot } from "@/lib/types";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * Thrown when a write violates the `piece_no_robot_overlap` exclusion

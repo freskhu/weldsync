@@ -8,7 +8,7 @@ import {
   updateProgram,
   deleteProgram,
 } from "@/lib/data/programs";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
 // Types for form state

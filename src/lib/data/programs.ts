@@ -8,7 +8,7 @@ import type {
   ProgramCreateInput,
   ProgramUpdateInput,
 } from "@/lib/validations/program";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAllRobots } from "@/lib/data/store";
 
 // ---------------------------------------------------------------------------
