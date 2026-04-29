@@ -6,12 +6,15 @@ import { PlanningWindowBar } from "@/components/planning/planning-window-bar";
 import { PrintButton } from "@/components/calendar/print-button";
 
 export default async function CalendarPage() {
-  const [pieces, projects, robots, planningWindow] = await Promise.all([
-    getAllPieces(),
-    getProjects(),
-    getRobots(),
-    getActivePlanningWindow(),
-  ]);
+  let pieces, projects, robots, planningWindow;
+  try { pieces = await getAllPieces(); }
+  catch (e) { console.error("[calendar] getAllPieces failed:", e); throw new Error(`calendar.getAllPieces: ${e instanceof Error ? e.message : String(e)}`); }
+  try { projects = await getProjects(); }
+  catch (e) { console.error("[calendar] getProjects failed:", e); throw new Error(`calendar.getProjects: ${e instanceof Error ? e.message : String(e)}`); }
+  try { robots = await getRobots(); }
+  catch (e) { console.error("[calendar] getRobots failed:", e); throw new Error(`calendar.getRobots: ${e instanceof Error ? e.message : String(e)}`); }
+  try { planningWindow = await getActivePlanningWindow(); }
+  catch (e) { console.error("[calendar] getActivePlanningWindow failed:", e); throw new Error(`calendar.getActivePlanningWindow: ${e instanceof Error ? e.message : String(e)}`); }
 
   // Build project lookup map for the client component
   const projectMap: Record<
