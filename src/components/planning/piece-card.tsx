@@ -14,7 +14,7 @@ interface PieceCardProps {
   isOverlay?: boolean;
   /** Called after the piece is successfully deleted on the server. */
   onDeleted?: (pieceId: string) => void;
-  /** Show ▲▼ priority arrows. True only on the "programmed" column. */
+  /** Show ▲▼ priority arrows. True only on the "planned" column. */
   showReorderArrows?: boolean;
   /** Disable ▲ at the top of the column. */
   canMoveUp?: boolean;
@@ -122,9 +122,9 @@ export function PieceCard({
     e.stopPropagation();
   }
 
-  // Footer shown only on programmed cards: who last changed status and when.
+  // Footer shown only on planned cards: who last changed status and when.
   const showAuditFooter =
-    piece.status === "programmed" &&
+    piece.status === "planned" &&
     !isOverlay &&
     !!piece.last_status_change_at;
   const auditDate = piece.last_status_change_at
@@ -155,7 +155,7 @@ export function PieceCard({
         style={{ backgroundColor: projectColor }}
       />
 
-      {/* Reorder arrows — top-left, programmed column only. Hidden until
+      {/* Reorder arrows — top-left, planned column only. Hidden until
           hover/focus; touch devices reveal them via the column's :focus-within
           fallback. Stacked vertically to keep the tap target above 24px each. */}
       {showReorderArrows && !isOverlay && (
@@ -289,7 +289,7 @@ export function PieceCard({
           )}
         </div>
 
-        {/* Audit footer — programmed column only. Shows who last moved the
+        {/* Audit footer — planned column only. Shows who last moved the
             piece and the date of that change. Falls back to "—" when the
             display name is unknown (user deleted, RPC missing, etc). */}
         {showAuditFooter && auditDate && (

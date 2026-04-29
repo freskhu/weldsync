@@ -267,46 +267,46 @@ export async function movePiece(
 }
 
 /**
- * Returns the next priority slot for the "programmed" column.
+ * Returns the next priority slot for the "planned" column.
  * MAX(priority)+1, or 1 if the column is empty.
  *
  * NOTE: not transactionally atomic — two concurrent inserts could race and
  * land on the same priority. Acceptable for this UX (single planner, low
  * concurrency); revisit with an RPC + advisory lock if it ever matters.
  */
-export async function nextProgrammedPriority(): Promise<number> {
+export async function nextPlannedPriority(): Promise<number> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("piece")
     .select("priority")
-    .eq("status", "programmed")
+    .eq("status", "planned")
     .not("priority", "is", null)
     .order("priority", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(`nextProgrammedPriority: ${error.message}`);
+  if (error) throw new Error(`nextPlannedPriority: ${error.message}`);
   const max = data?.priority ?? 0;
   return max + 1;
 }
 
 /**
- * Returns the immediate neighbour of `piece` in the programmed column,
+ * Returns the immediate neighbour of `piece` in the planned column,
  * either above (smaller priority) or below (larger priority). Null if the
  * piece is already at the boundary.
  */
-export async function getProgrammedNeighbour(
+export async function getPlannedNeighbour(
   pieceId: string,
   direction: "up" | "down"
 ): Promise<Piece | null> {
   const target = await getPieceById(pieceId);
-  if (!target || target.status !== "programmed" || target.priority == null) {
+  if (!target || target.status !== "planned" || target.priority == null) {
     return null;
   }
   const supabase = await createServerSupabaseClient();
   const query = supabase
     .from("piece")
     .select("*")
-    .eq("status", "programmed")
+    .eq("status", "planned")
     .not("priority", "is", null);
 
   if (direction === "up") {
@@ -315,7 +315,7 @@ export async function getProgrammedNeighbour(
     query.gt("priority", target.priority).order("priority", { ascending: true });
   }
   const { data, error } = await query.limit(1).maybeSingle();
-  if (error) throw new Error(`getProgrammedNeighbour: ${error.message}`);
+  if (error) throw new Error(`getPlannedNeighbour: ${error.message}`);
   return data;
 }
 
@@ -325,9 +325,9 @@ export async function getProgrammedNeighbour(
  * temporary "duplicate" between the two writes is harmless.
  *
  * Returns both pieces with their new priorities, or null if either was not
- * found / not programmed.
+ * found / not planned.
  */
-export async function swapProgrammedPriorities(
+export async function swapPlannedPriorities(
   pieceA: Piece,
   pieceB: Piece
 ): Promise<{ a: Piece; b: Piece } | null> {

@@ -16,9 +16,9 @@ import {
   linkProgram as dbLinkProgram,
   unlinkProgram as dbUnlinkProgram,
   PieceOverlapError,
-  nextProgrammedPriority,
-  getProgrammedNeighbour,
-  swapProgrammedPriorities,
+  nextPlannedPriority,
+  getPlannedNeighbour,
+  swapPlannedPriorities,
 } from "@/lib/data/store";
 import type { Piece, PieceStatus } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
@@ -48,7 +48,7 @@ function parsePiecePeriod(
 
 /**
  * Builds the audit fields injected on every status-changing mutation.
- * Centralized so that all entry/exit paths to "programmed" stay consistent.
+ * Centralized so that all entry/exit paths to "planned" stay consistent.
  */
 function statusAuditPatch(userId: string | null) {
   return {
@@ -112,9 +112,9 @@ export async function createPieceAction(
   const supabase = await createClient();
   const userId = await getCurrentUserId(supabase);
 
-  // If creating directly into "programmed", grab the next priority slot.
+  // If creating directly into "planned", grab the next priority slot.
   const priority =
-    result.data.status === "programmed" ? await nextProgrammedPriority() : null;
+    result.data.status === "planned" ? await nextPlannedPriority() : null;
 
   let created;
   try {
@@ -266,8 +266,8 @@ const VALID_STATUSES: PieceStatus[] = [
  *
  * Centralizes:
  *   - audit fields (last_status_change_by/at)
- *   - priority lifecycle (cleared on exit from programmed; assigned via
- *     programPieceWithRobotAction on entry)
+ *   - priority lifecycle (cleared on exit from planned; assigned on entry
+ *     to planned)
  *   - calendar/robot cleanup on "completed"
  *   - calendar/robot cleanup on move out of "allocated" (back to backlog/planned)
  */
@@ -292,15 +292,14 @@ export async function movePieceAction(
     ...statusAuditPatch(userId),
   };
 
-  // Leaving "programmed" -> clear priority slot.
-  if (before.status === "programmed" && newStatus !== "programmed") {
+  // Leaving "planned" -> clear priority slot.
+  if (before.status === "planned" && newStatus !== "planned") {
     patch.priority = null;
   }
 
-  // Entering "programmed" via this generic action (rare — usually goes
-  // through programPieceWithRobotAction). Assign next slot if not already set.
-  if (before.status !== "programmed" && newStatus === "programmed") {
-    patch.priority = await nextProgrammedPriority();
+  // Entering "planned" -> assign next priority slot.
+  if (before.status !== "planned" && newStatus === "planned") {
+    patch.priority = await nextPlannedPriority();
   }
 
   // "completed" drops the piece off the calendar AND off the robot.
@@ -470,7 +469,7 @@ export async function allocatePieceDirectAction(
 
 /**
  * Shared allocation pipeline. Sets status='allocated', clears priority if the
- * piece was in "programmed", and stamps the audit fields.
+ * piece was in "planned", and stamps the audit fields.
  */
 async function allocatePieceCore(
   pieceId: string,
@@ -491,7 +490,7 @@ async function allocatePieceCore(
     scheduled_period: period,
     ...statusAuditPatch(userId),
   };
-  if (before.status === "programmed") patch.priority = null;
+  if (before.status === "planned") patch.priority = null;
 
   let piece;
   try {
@@ -546,8 +545,9 @@ export async function deallocatePieceAction(
  * Used by the kanban "Programada" column drop flow — the user picks which
  * robot was programmed and we persist both fields in one UPDATE.
  *
- * Assigns the next priority slot (MAX+1) only when entering programmed for
- * the first time. Re-running on an already-programmed piece keeps the slot.
+ * Priority lives on the "planned" column, not here — so on entry to
+ * programmed we always clear `priority` (in case the piece is coming from
+ * planned with a slot assigned).
  *
  * Does NOT touch dates (planned_*, scheduled_*). Robot picker is purely a
  * "which station did this get programmed on" record.
@@ -570,12 +570,9 @@ export async function programPieceWithRobotAction(
   const patch: Parameters<typeof dbUpdatePiece>[1] = {
     status: "programmed",
     robot_id: robotId,
+    priority: null,
     ...statusAuditPatch(userId),
   };
-  // Only assign a fresh slot if the piece is entering programmed.
-  if (before.status !== "programmed" || before.priority == null) {
-    patch.priority = await nextProgrammedPriority();
-  }
 
   let piece;
   try {
@@ -596,9 +593,9 @@ export async function programPieceWithRobotAction(
   return { success: true };
 }
 
-// --- Programmed priority reorder (▲▼ arrows on Programada column) ---
+// --- Planned priority reorder (▲▼ arrows on Planeados column) ---
 
-async function reorderProgrammed(
+async function reorderPlanned(
   pieceId: string,
   direction: "up" | "down"
 ): Promise<ActionResult> {
@@ -606,25 +603,25 @@ async function reorderProgrammed(
 
   const target = await getPieceById(pieceId);
   if (!target) return { success: false, error: "Peca nao encontrada." };
-  if (target.status !== "programmed") {
-    return { success: false, error: "Peca nao esta na coluna Programada." };
+  if (target.status !== "planned") {
+    return { success: false, error: "Peca nao esta na coluna Planeados." };
   }
   if (target.priority == null) {
-    // Backfill: piece is programmed but has no slot. Assign one and stop —
+    // Backfill: piece is planned but has no slot. Assign one and stop —
     // there's nothing to swap with yet.
-    await dbUpdatePiece(pieceId, { priority: await nextProgrammedPriority() });
+    await dbUpdatePiece(pieceId, { priority: await nextPlannedPriority() });
     revalidatePath("/planning");
     return { success: true };
   }
 
-  const neighbour = await getProgrammedNeighbour(pieceId, direction);
+  const neighbour = await getPlannedNeighbour(pieceId, direction);
   // No-op at boundary — succeed silently so the optimistic UI reverts cleanly.
   if (!neighbour) {
     revalidatePath("/planning");
     return { success: true };
   }
 
-  const swapped = await swapProgrammedPriorities(target, neighbour);
+  const swapped = await swapPlannedPriorities(target, neighbour);
   if (!swapped) {
     return { success: false, error: "Falha ao reordenar." };
   }
@@ -636,13 +633,13 @@ async function reorderProgrammed(
 export async function movePieceUpAction(
   pieceId: string
 ): Promise<ActionResult> {
-  return reorderProgrammed(pieceId, "up");
+  return reorderPlanned(pieceId, "up");
 }
 
 export async function movePieceDownAction(
   pieceId: string
 ): Promise<ActionResult> {
-  return reorderProgrammed(pieceId, "down");
+  return reorderPlanned(pieceId, "down");
 }
 
 // --- Planned range (span block) actions ---

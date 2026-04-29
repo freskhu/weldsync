@@ -127,7 +127,7 @@ export function KanbanBoard({
     });
   }, [filteredPieces]);
 
-  // Group by status. The "programmed" column is re-sorted by `priority` ASC
+  // Group by status. The "planned" column is re-sorted by `priority` ASC
   // (NULLS LAST) — overrides the urgent/deadline ordering used everywhere else
   // because this column is explicitly user-ranked via the ▲▼ arrows.
   const columnPieces = useMemo(() => {
@@ -142,7 +142,7 @@ export function KanbanBoard({
     for (const piece of sortedPieces) {
       map[piece.status].push(piece);
     }
-    map.programmed.sort((a, b) => {
+    map.planned.sort((a, b) => {
       const pa = a.priority;
       const pb = b.priority;
       if (pa == null && pb == null) return 0;
@@ -335,7 +335,7 @@ export function KanbanBoard({
   }, []);
 
   /**
-   * Reorder a piece up/down within the "programmed" column.
+   * Reorder a piece up/down within the "planned" column.
    * Optimistic: swap priority locally, then call the server. Revert on failure.
    * The server is the source of truth for the actual numeric values, but the
    * relative order is what the user cares about — so swapping locally is safe.
@@ -343,7 +343,7 @@ export function KanbanBoard({
   const handleReorder = useCallback(
     async (pieceId: string, direction: "up" | "down") => {
       const target = pieces.find((p) => p.id === pieceId);
-      if (!target || target.status !== "programmed") return;
+      if (!target || target.status !== "planned") return;
       if (target.priority == null) {
         // No local swap possible — just hit the server (it will backfill).
         const result =
@@ -356,17 +356,17 @@ export function KanbanBoard({
         return;
       }
 
-      // Find neighbour in the sorted programmed column.
-      const programmed = pieces
+      // Find neighbour in the sorted planned column.
+      const planned = pieces
         .filter(
-          (p) => p.status === "programmed" && p.priority != null
+          (p) => p.status === "planned" && p.priority != null
         )
         .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
-      const idx = programmed.findIndex((p) => p.id === pieceId);
+      const idx = planned.findIndex((p) => p.id === pieceId);
       if (idx === -1) return;
       const neighbourIdx = direction === "up" ? idx - 1 : idx + 1;
-      if (neighbourIdx < 0 || neighbourIdx >= programmed.length) return; // boundary
-      const neighbour = programmed[neighbourIdx];
+      if (neighbourIdx < 0 || neighbourIdx >= planned.length) return; // boundary
+      const neighbour = planned[neighbourIdx];
       if (neighbour.priority == null) return;
 
       const previousPieces = [...pieces];
@@ -430,7 +430,7 @@ export function KanbanBoard({
               isOver={overId === col.id}
             >
               {columnPieces[col.id].map((piece, idx, arr) => {
-                const isProgrammed = col.id === "programmed";
+                const isPlanned = col.id === "planned";
                 const changedByName = piece.last_status_change_by
                   ? userMap[piece.last_status_change_by] ?? null
                   : null;
@@ -447,16 +447,16 @@ export function KanbanBoard({
                     }
                     isDragging={activeId === piece.id}
                     onDeleted={handleDeletePiece}
-                    showReorderArrows={isProgrammed}
-                    canMoveUp={isProgrammed && idx > 0}
-                    canMoveDown={isProgrammed && idx < arr.length - 1}
+                    showReorderArrows={isPlanned}
+                    canMoveUp={isPlanned && idx > 0}
+                    canMoveDown={isPlanned && idx < arr.length - 1}
                     onMoveUp={
-                      isProgrammed
+                      isPlanned
                         ? () => handleReorder(piece.id, "up")
                         : undefined
                     }
                     onMoveDown={
-                      isProgrammed
+                      isPlanned
                         ? () => handleReorder(piece.id, "down")
                         : undefined
                     }
