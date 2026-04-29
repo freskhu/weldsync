@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -15,11 +16,56 @@ import {
 } from "@dnd-kit/core";
 import type { Piece, PieceStatus, Robot } from "@/lib/types";
 import {
-  movePieceAction,
   deallocatePieceAction,
-  movePieceUpAction,
-  movePieceDownAction,
 } from "@/app/actions/piece-actions";
+
+type MoveResult = { success: true } | { success: false; error?: string };
+
+async function movePieceREST(
+  pieceId: string,
+  status: PieceStatus
+): Promise<MoveResult> {
+  try {
+    const res = await fetch(`/api/pieces/${pieceId}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data?.error ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function reorderPieceREST(
+  pieceId: string,
+  direction: "up" | "down"
+): Promise<MoveResult> {
+  try {
+    const res = await fetch(`/api/pieces/${pieceId}/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ direction }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data?.error ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 import { KanbanColumn } from "./kanban-column";
 import { PieceCard } from "./piece-card";
 import { KanbanFilters } from "./kanban-filters";
@@ -49,6 +95,7 @@ export function KanbanBoard({
   robots,
   userMap,
 }: KanbanBoardProps) {
+  const router = useRouter();
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -245,7 +292,7 @@ export function KanbanBoard({
 
           // If target is not backlog (deallocate sets backlog), move to actual target
           if (targetStatus !== "backlog") {
-            const moveResult = await movePieceAction(pieceId, targetStatus);
+            const moveResult = await movePieceREST(pieceId, targetStatus);
             if (!moveResult.success) {
               setPieces(previousPieces);
               console.error("Failed to move piece:", moveResult.error);
@@ -286,30 +333,20 @@ export function KanbanBoard({
       // Without try/catch the rejection bubbles up and the optimistic state
       // stays on screen — user sees a "successful" move but a refresh reveals
       // it never persisted.
-      try {
-        const result = await movePieceAction(pieceId, targetStatus);
-        if (!result.success) {
-          setPieces(previousPieces);
-          console.error("Failed to move piece:", result.error);
-          setDebugError(
-            `[DEBUG] movePieceAction failed\n\n${
-              result.error ?? "(sem mensagem)"
-            }\n\nFrom: ${piece.status}\nTo: ${targetStatus}`
-          );
-        }
-      } catch (err) {
+      const result = await movePieceREST(pieceId, targetStatus);
+      if (!result.success) {
         setPieces(previousPieces);
-        console.error("movePieceAction threw:", err);
-        const msg = err instanceof Error ? err.message : String(err);
-        const digest = (err as { digest?: string })?.digest;
+        console.error("Failed to move piece:", result.error);
         setDebugError(
-          `[DEBUG] movePieceAction THREW\n\n${msg}${
-            digest ? `\n\ndigest: ${digest}` : ""
+          `Não foi possível mover a peça.\n\n${
+            result.error ?? "(sem mensagem)"
           }\n\nFrom: ${piece.status}\nTo: ${targetStatus}`
         );
+      } else {
+        router.refresh();
       }
     },
-    [pieces]
+    [pieces, router]
   );
 
   const handleDragCancel = useCallback(() => {
@@ -379,12 +416,11 @@ export function KanbanBoard({
       if (!target || target.status !== "planned") return;
       if (target.priority == null) {
         // No local swap possible — just hit the server (it will backfill).
-        const result =
-          direction === "up"
-            ? await movePieceUpAction(pieceId)
-            : await movePieceDownAction(pieceId);
+        const result = await reorderPieceREST(pieceId, direction);
         if (!result.success) {
           console.error("Failed to reorder piece:", result.error);
+        } else {
+          router.refresh();
         }
         return;
       }
@@ -413,16 +449,15 @@ export function KanbanBoard({
         })
       );
 
-      const result =
-        direction === "up"
-          ? await movePieceUpAction(pieceId)
-          : await movePieceDownAction(pieceId);
+      const result = await reorderPieceREST(pieceId, direction);
       if (!result.success) {
         setPieces(previousPieces);
         console.error("Failed to reorder piece:", result.error);
+      } else {
+        router.refresh();
       }
     },
-    [pieces]
+    [pieces, router]
   );
 
   const hasFilters = !!(filterProject || filterRobot || filterUrgent);
