@@ -58,6 +58,10 @@ export function KanbanBoard({
   // Robot picker modal state (for "programmed" drop)
   const [pendingProgram, setPendingProgram] = useState<Piece | null>(null);
 
+  // Debug error modal state — temporary instrumentation while we
+  // diagnose the Backlog→Planeados persistence bug.
+  const [debugError, setDebugError] = useState<string | null>(null);
+
   // Filters
   const [filterProject, setFilterProject] = useState<string>("");
   const [filterRobot, setFilterRobot] = useState<string>("");
@@ -287,8 +291,8 @@ export function KanbanBoard({
         if (!result.success) {
           setPieces(previousPieces);
           console.error("Failed to move piece:", result.error);
-          alert(
-            `[DEBUG] movePieceAction failed:\n\n${
+          setDebugError(
+            `[DEBUG] movePieceAction failed\n\n${
               result.error ?? "(sem mensagem)"
             }\n\nFrom: ${piece.status}\nTo: ${targetStatus}`
           );
@@ -298,8 +302,8 @@ export function KanbanBoard({
         console.error("movePieceAction threw:", err);
         const msg = err instanceof Error ? err.message : String(err);
         const digest = (err as { digest?: string })?.digest;
-        alert(
-          `[DEBUG] movePieceAction THREW:\n\n${msg}${
+        setDebugError(
+          `[DEBUG] movePieceAction THREW\n\n${msg}${
             digest ? `\n\ndigest: ${digest}` : ""
           }\n\nFrom: ${piece.status}\nTo: ${targetStatus}`
         );
@@ -538,6 +542,49 @@ export function KanbanBoard({
           onConfirm={handleProgramConfirm}
           onCancel={handleProgramCancel}
         />
+      )}
+
+      {/* DEBUG: error modal with copy button. Temporary while diagnosing. */}
+      {debugError && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setDebugError(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-red-700 mb-3">
+              Erro detectado (debug)
+            </h2>
+            <textarea
+              readOnly
+              value={debugError}
+              className="w-full h-48 font-mono text-xs bg-zinc-100 border border-zinc-300 rounded p-2 text-zinc-900"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <div className="flex gap-2 mt-3 justify-end">
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(debugError);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                Copiar
+              </button>
+              <button
+                onClick={() => setDebugError(null)}
+                className="px-3 py-1.5 bg-zinc-200 text-zinc-800 text-sm rounded hover:bg-zinc-300"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
