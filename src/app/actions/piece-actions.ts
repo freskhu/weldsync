@@ -275,87 +275,118 @@ export async function movePieceAction(
   pieceId: string,
   newStatus: PieceStatus
 ): Promise<ActionResult> {
-  if (!pieceId) return { success: false, error: "ID da peca em falta." };
-  if (!VALID_STATUSES.includes(newStatus)) {
-    return { success: false, error: "Estado invalido." };
-  }
-
-  const before = await getPieceById(pieceId);
-  if (!before) return { success: false, error: "Peca nao encontrada." };
-
-  const supabase = await createClient();
-  const userId = await getCurrentUserId(supabase);
-
-  // Build the patch incrementally based on transition.
-  const patch: Parameters<typeof dbUpdatePiece>[1] = {
-    status: newStatus,
-    ...statusAuditPatch(userId),
-  };
-
-  // Leaving "planned" -> clear priority slot.
-  if (before.status === "planned" && newStatus !== "planned") {
-    patch.priority = null;
-  }
-
-  // Entering "planned" -> assign next priority slot.
-  if (before.status !== "planned" && newStatus === "planned") {
-    patch.priority = await nextPlannedPriority();
-  }
-
-  // "completed" drops the piece off the calendar AND off the robot.
-  if (newStatus === "completed") {
-    patch.planned_start_date = null;
-    patch.planned_end_date = null;
-    patch.planned_start_period = null;
-    patch.planned_end_period = null;
-    patch.robot_id = null;
-    patch.scheduled_date = null;
-    patch.scheduled_period = null;
-  }
-
-  // Moving OUT of "allocated" frees the calendar slot.
-  if (before.status === "allocated" && newStatus !== "allocated") {
-    patch.scheduled_date = null;
-    patch.scheduled_period = null;
-    if (newStatus === "backlog" || newStatus === "planned") {
-      patch.robot_id = null;
-    }
-  }
-
-  let piece;
   try {
-    piece = await dbUpdatePiece(pieceId, patch);
-  } catch (err) {
-    if (err instanceof PieceOverlapError) {
-      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    if (!pieceId) return { success: false, error: "ID da peca em falta." };
+    if (!VALID_STATUSES.includes(newStatus)) {
+      return { success: false, error: "Estado invalido." };
     }
-    // Anything else (FK violation, RLS rejection, network, etc.) — log and
-    // return a non-throwing failure so the client reverts cleanly. Throwing
-    // out of a Server Action propagates to the caller as an unhandled
-    // rejection and the optimistic UI gets stuck.
-    console.error("[movePieceAction] dbUpdatePiece failed:", {
+
+    console.log("[movePieceAction] start", { pieceId, newStatus });
+
+    const before = await getPieceById(pieceId);
+    if (!before) return { success: false, error: "Peca nao encontrada." };
+
+    const supabase = await createClient();
+    const userId = await getCurrentUserId(supabase);
+
+    console.log("[movePieceAction] user resolved", { userId, fromStatus: before.status });
+
+    // Build the patch incrementally based on transition.
+    const patch: Parameters<typeof dbUpdatePiece>[1] = {
+      status: newStatus,
+      ...statusAuditPatch(userId),
+    };
+
+    // Leaving "planned" -> clear priority slot.
+    if (before.status === "planned" && newStatus !== "planned") {
+      patch.priority = null;
+    }
+
+    // Entering "planned" -> assign next priority slot.
+    if (before.status !== "planned" && newStatus === "planned") {
+      try {
+        patch.priority = await nextPlannedPriority();
+        console.log("[movePieceAction] priority assigned", { priority: patch.priority });
+      } catch (err) {
+        console.error("[movePieceAction] nextPlannedPriority failed:", err instanceof Error ? err.message : String(err));
+        return { success: false, error: "Falha ao calcular prioridade." };
+      }
+    }
+
+    // "completed" drops the piece off the calendar AND off the robot.
+    if (newStatus === "completed") {
+      patch.planned_start_date = null;
+      patch.planned_end_date = null;
+      patch.planned_start_period = null;
+      patch.planned_end_period = null;
+      patch.robot_id = null;
+      patch.scheduled_date = null;
+      patch.scheduled_period = null;
+    }
+
+    // Moving OUT of "allocated" frees the calendar slot.
+    if (before.status === "allocated" && newStatus !== "allocated") {
+      patch.scheduled_date = null;
+      patch.scheduled_period = null;
+      if (newStatus === "backlog" || newStatus === "planned") {
+        patch.robot_id = null;
+      }
+    }
+
+    let piece;
+    try {
+      piece = await dbUpdatePiece(pieceId, patch);
+      console.log("[movePieceAction] dbUpdatePiece ok", { pieceId, newStatus });
+    } catch (err) {
+      if (err instanceof PieceOverlapError) {
+        return { success: false, error: PIECE_OVERLAP_MESSAGE };
+      }
+      console.error("[movePieceAction] dbUpdatePiece failed:", {
+        pieceId,
+        from: before.status,
+        to: newStatus,
+        userId,
+        patch,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      return {
+        success: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Não foi possível mover a peça.",
+      };
+    }
+    if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+    try {
+      await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
+    } catch (err) {
+      console.error("[movePieceAction] logAudit threw (should never happen):", err instanceof Error ? err.message : String(err));
+    }
+
+    try {
+      revalidatePath("/planning");
+      revalidatePath("/calendar");
+      revalidatePath("/robots");
+    } catch (err) {
+      console.error("[movePieceAction] revalidatePath failed:", err instanceof Error ? err.message : String(err));
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[movePieceAction] outer catch:", {
       pieceId,
-      from: before.status,
-      to: newStatus,
-      userId,
+      newStatus,
       error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
     });
     return {
       success: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Não foi possível mover a peça.",
+      error: err instanceof Error ? err.message : "Erro inesperado.",
     };
   }
-  if (!piece) return { success: false, error: "Peca nao encontrada." };
-
-  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
-
-  revalidatePath("/planning");
-  revalidatePath("/calendar");
-  revalidatePath("/robots");
-  return { success: true };
 }
 
 export async function deletePieceAction(
@@ -616,35 +647,50 @@ async function reorderPlanned(
   pieceId: string,
   direction: "up" | "down"
 ): Promise<ActionResult> {
-  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+  try {
+    if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
-  const target = await getPieceById(pieceId);
-  if (!target) return { success: false, error: "Peca nao encontrada." };
-  if (target.status !== "planned") {
-    return { success: false, error: "Peca nao esta na coluna Planeados." };
-  }
-  if (target.priority == null) {
-    // Backfill: piece is planned but has no slot. Assign one and stop —
-    // there's nothing to swap with yet.
-    await dbUpdatePiece(pieceId, { priority: await nextPlannedPriority() });
-    revalidatePath("/planning");
+    console.log("[reorderPlanned] start", { pieceId, direction });
+
+    const target = await getPieceById(pieceId);
+    if (!target) return { success: false, error: "Peca nao encontrada." };
+    if (target.status !== "planned") {
+      return { success: false, error: "Peca nao esta na coluna Planeados." };
+    }
+    if (target.priority == null) {
+      console.log("[reorderPlanned] backfill priority");
+      await dbUpdatePiece(pieceId, { priority: await nextPlannedPriority() });
+      try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
+      return { success: true };
+    }
+
+    const neighbour = await getPlannedNeighbour(pieceId, direction);
+    if (!neighbour) {
+      console.log("[reorderPlanned] no neighbour, boundary");
+      try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
+      return { success: true };
+    }
+
+    const swapped = await swapPlannedPriorities(target, neighbour);
+    if (!swapped) {
+      return { success: false, error: "Falha ao reordenar." };
+    }
+
+    console.log("[reorderPlanned] swap done");
+    try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
     return { success: true };
+  } catch (err) {
+    console.error("[reorderPlanned] outer catch:", {
+      pieceId,
+      direction,
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Erro inesperado.",
+    };
   }
-
-  const neighbour = await getPlannedNeighbour(pieceId, direction);
-  // No-op at boundary — succeed silently so the optimistic UI reverts cleanly.
-  if (!neighbour) {
-    revalidatePath("/planning");
-    return { success: true };
-  }
-
-  const swapped = await swapPlannedPriorities(target, neighbour);
-  if (!swapped) {
-    return { success: false, error: "Falha ao reordenar." };
-  }
-
-  revalidatePath("/planning");
-  return { success: true };
 }
 
 export async function movePieceUpAction(
