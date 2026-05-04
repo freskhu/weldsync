@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useDraggable } from "@dnd-kit/core";
+import { useDndMonitor, useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
 import { textOn, mutedTextOn } from "@/lib/color-utils";
 import { deletePieceAction } from "@/app/actions/piece-actions";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Unplanned Sidebar — left rail on the Gantt view listing pieces that have
@@ -52,6 +53,7 @@ function UnplannedCard({
 }: UnplannedCardProps) {
   const router = useRouter();
   const [isDeleting, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: sidebarDragIdFor(piece.id),
@@ -82,22 +84,27 @@ function UnplannedCard({
   function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     e.preventDefault();
-    const ok = window.confirm(
-      `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`
-    );
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set("id", piece.id);
-    fd.set("project_id", piece.project_id);
+    // Accessible confirm dialog. Action runs inside onConfirm so the dialog
+    // owns the loading + inline error state. The wrapping useTransition keeps
+    // the card's delete-button spinner alive while the server action runs.
     startDeleteTransition(async () => {
-      const result = await deletePieceAction(fd);
-      if (!result.success) {
-        window.alert(
-          `Não foi possível eliminar a peça: ${result.error ?? "erro desconhecido"}`
-        );
-        return;
-      }
-      router.refresh();
+      await confirm({
+        title: "Eliminar peça",
+        description: `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`,
+        confirmLabel: "Eliminar",
+        cancelLabel: "Cancelar",
+        tone: "destructive",
+        onConfirm: async () => {
+          const fd = new FormData();
+          fd.set("id", piece.id);
+          fd.set("project_id", piece.project_id);
+          const result = await deletePieceAction(fd);
+          if (!result.success) {
+            throw new Error(result.error ?? "Erro desconhecido.");
+          }
+          router.refresh();
+        },
+      });
     });
   }
 
@@ -118,14 +125,14 @@ function UnplannedCard({
       <div className="relative flex items-center justify-between gap-2 pointer-events-none">
         <div className="flex items-baseline gap-1.5 min-w-0">
           <span
-            className="text-[11.5px] font-bold font-mono truncate"
+            className="text-[14px] md:text-[11.5px] font-bold font-mono truncate"
             style={{ color: ink }}
           >
             {piece.reference}
           </span>
           {clientRef && (
             <span
-              className="text-[10px] font-mono truncate"
+              className="text-[12px] md:text-[10px] font-mono truncate"
               style={{ color: inkMuted }}
             >
               {clientRef}
@@ -152,7 +159,7 @@ function UnplannedCard({
       </div>
       {piece.description && (
         <p
-          className="relative text-[11px] truncate mt-0.5 pointer-events-none"
+          className="relative text-[13px] md:text-[11px] truncate mt-0.5 pointer-events-none"
           style={{ color: inkMuted }}
         >
           {piece.description}
@@ -160,7 +167,7 @@ function UnplannedCard({
       )}
       {metric && (
         <p
-          className="relative text-[10px] mt-0.5 pointer-events-none"
+          className="relative text-[12px] md:text-[10px] mt-0.5 pointer-events-none"
           style={{ color: inkMuted }}
         >
           {metric}
@@ -169,7 +176,7 @@ function UnplannedCard({
       {robotName && (
         <div className="relative mt-1 pointer-events-none">
           <span
-            className="inline-flex items-center text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-black/15 max-w-full truncate"
+            className="inline-flex items-center text-[12px] md:text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-black/15 max-w-full truncate"
             style={{ color: ink }}
             title={`Robot: ${robotName}`}
           >
@@ -183,7 +190,7 @@ function UnplannedCard({
         type="button"
         onClick={handleDelete}
         disabled={isDeleting}
-        className="absolute top-0.5 right-0.5 w-8 h-8 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-black/20 disabled:opacity-50 transition-opacity"
+        className="absolute top-0.5 right-0.5 w-11 h-11 md:w-8 md:h-8 flex items-center justify-center rounded-md opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-black/20 disabled:opacity-50 transition-opacity"
         style={{ color: ink }}
         title="Eliminar peça definitivamente"
         aria-label={`Eliminar peça ${piece.reference}`}
@@ -230,6 +237,42 @@ export function UnplannedSidebar({
   projectMap,
   robotMap,
 }: UnplannedSidebarProps) {
+  // Drawer state for <lg viewports. On lg+, the sidebar is always rendered
+  // as a persistent left rail; the drawer plumbing is dormant.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Close the drawer if the viewport crosses up to lg+ (sidebar becomes
+  // persistent and the toggle button disappears).
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth >= 1024) setDrawerOpen(false);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // While a drag is in progress, do NOT auto-close the drawer. The user is
+  // mid-action; closing the source rail would cancel the drag. We listen to
+  // the parent DndContext via useDndMonitor — this hook is safe because the
+  // sidebar always lives inside <DndContext> in gantt-dnd-chart.tsx.
+  const [dragging, setDragging] = useState(false);
+  useDndMonitor({
+    onDragStart: () => setDragging(true),
+    onDragEnd: () => setDragging(false),
+    onDragCancel: () => setDragging(false),
+  });
+
+  // Lock body scroll while drawer is open on mobile, similar to the main
+  // app sidebar pattern. Restored on cleanup.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [drawerOpen]);
+
   const unplanned = useMemo(
     () =>
       pieces.filter(
@@ -259,70 +302,145 @@ export function UnplannedSidebar({
     });
   }, [unplanned, projectMap]);
 
-  return (
-    <aside
-      className="flex-shrink-0 w-64 border border-zinc-200 rounded-lg bg-zinc-50 flex flex-col overflow-hidden"
-      aria-label="Peças por planear"
-    >
-      <header className="px-3 py-2 border-b border-zinc-200 bg-white flex-shrink-0">
+  // Body of the sidebar — rendered identically in both layouts (drawer +
+  // persistent). Extracted so we don't duplicate the markup.
+  const Body = (
+    <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-3">
+      {grouped.length === 0 ? (
+        <div className="text-center text-xs text-zinc-400 py-8 px-2">
+          Todas as peças activas já têm intervalo planeado.
+        </div>
+      ) : (
+        grouped.map(([projectId, projectPieces]) => {
+          const project = projectMap[projectId];
+          const name = project?.name ?? "Projecto desconhecido";
+          const color = project?.color ?? "#6B7280";
+          const clientRef = project?.client_ref ?? "";
+          return (
+            <section key={projectId} className="space-y-1.5">
+              <header className="flex items-center gap-2 px-1">
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: color }}
+                />
+                <h3 className="text-[13px] md:text-[11px] font-semibold text-zinc-700 truncate">
+                  {name}
+                </h3>
+                {clientRef && (
+                  <span className="text-[12px] md:text-[10px] font-mono text-zinc-500 truncate">
+                    {clientRef}
+                  </span>
+                )}
+                <span className="text-[12px] md:text-[10px] text-zinc-400 ml-auto">
+                  {projectPieces.length}
+                </span>
+              </header>
+              <div className="space-y-1.5">
+                {projectPieces.map((piece) => (
+                  <UnplannedCard
+                    key={piece.id}
+                    piece={piece}
+                    color={color}
+                    clientRef={clientRef}
+                    robotName={
+                      piece.robot_id != null
+                        ? robotMap?.[piece.robot_id] ?? null
+                        : null
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })
+      )}
+    </div>
+  );
+
+  const Header = (
+    <header className="px-3 py-2 border-b border-zinc-200 bg-white flex-shrink-0 flex items-center justify-between gap-2">
+      <div>
         <h2 className="text-xs font-semibold text-zinc-700 uppercase tracking-wider">
           Por planear
         </h2>
-        <p className="text-[11px] text-zinc-500 mt-0.5">
+        <p className="text-[13px] md:text-[11px] text-zinc-500 mt-0.5">
           {unplanned.length}{" "}
           {unplanned.length === 1 ? "peça" : "peças"} — arrasta para a grelha
         </p>
-      </header>
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-3">
-        {grouped.length === 0 ? (
-          <div className="text-center text-xs text-zinc-400 py-8 px-2">
-            Todas as peças activas já têm intervalo planeado.
-          </div>
-        ) : (
-          grouped.map(([projectId, projectPieces]) => {
-            const project = projectMap[projectId];
-            const name = project?.name ?? "Projecto desconhecido";
-            const color = project?.color ?? "#6B7280";
-            const clientRef = project?.client_ref ?? "";
-            return (
-              <section key={projectId} className="space-y-1.5">
-                <header className="flex items-center gap-2 px-1">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                  />
-                  <h3 className="text-[11px] font-semibold text-zinc-700 truncate">
-                    {name}
-                  </h3>
-                  {clientRef && (
-                    <span className="text-[10px] font-mono text-zinc-500 truncate">
-                      {clientRef}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-zinc-400 ml-auto">
-                    {projectPieces.length}
-                  </span>
-                </header>
-                <div className="space-y-1.5">
-                  {projectPieces.map((piece) => (
-                    <UnplannedCard
-                      key={piece.id}
-                      piece={piece}
-                      color={color}
-                      clientRef={clientRef}
-                      robotName={
-                        piece.robot_id != null
-                          ? robotMap?.[piece.robot_id] ?? null
-                          : null
-                      }
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })
-        )}
       </div>
-    </aside>
+      {/* Close button — only useful in drawer mode. Hidden on lg+. */}
+      <button
+        type="button"
+        onClick={() => setDrawerOpen(false)}
+        className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 touch-manipulation"
+        aria-label="Fechar painel"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </header>
+  );
+
+  return (
+    <>
+      {/* ---- <lg drawer toggle (FAB-style button) ---- */}
+      {/* Only visible when drawer is closed; opens the slide-in panel.
+          Sits in normal flow as a flex-shrink-0 button so it doesn't disturb
+          the gantt layout next to it. */}
+      {!drawerOpen && (
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="lg:hidden flex-shrink-0 self-start flex items-center gap-2 px-3 min-h-[44px] bg-white border border-zinc-300 rounded-lg shadow-sm text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 touch-manipulation"
+          aria-label={`Abrir peças por planear (${unplanned.length})`}
+          aria-expanded={false}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <span>Por planear</span>
+          <span
+            className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-zinc-900 text-white text-[11px] font-bold"
+            aria-hidden="true"
+          >
+            {unplanned.length}
+          </span>
+        </button>
+      )}
+
+      {/* ---- <lg backdrop ---- */}
+      {/* Tappable to dismiss, but only when no drag is in progress. */}
+      {drawerOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          onClick={() => {
+            if (!dragging) setDrawerOpen(false);
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ---- <lg slide-in drawer ---- */}
+      <aside
+        className={`lg:hidden fixed top-0 left-0 z-40 w-[280px] max-w-[85vw] h-[100dvh] bg-zinc-50 border-r border-zinc-200 flex flex-col shadow-xl transform transition-transform duration-200 ease-out ${
+          drawerOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        aria-label="Peças por planear"
+        aria-hidden={!drawerOpen}
+      >
+        {Header}
+        {Body}
+      </aside>
+
+      {/* ---- lg+ persistent left rail ---- */}
+      <aside
+        className="hidden lg:flex flex-shrink-0 w-64 border border-zinc-200 rounded-lg bg-zinc-50 flex-col overflow-hidden"
+        aria-label="Peças por planear"
+      >
+        {Header}
+        {Body}
+      </aside>
+    </>
   );
 }

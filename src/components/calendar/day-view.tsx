@@ -31,6 +31,7 @@ interface DayViewProps {
   pieces: Piece[];
   robots: Robot[];
   projectMap: Record<string, { name: string; color: string }>;
+  initialDate?: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,10 +232,13 @@ export function DayView({
   pieces: initialPieces,
   robots,
   projectMap,
+  initialDate,
 }: DayViewProps) {
   const dndId = useId();
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(
+    () => initialDate ?? new Date()
+  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     message: string;
@@ -277,7 +281,8 @@ export function DayView({
     activationConstraint: { distance: 8 },
   });
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 200, tolerance: 8 },
+    // 250ms long-press before drag starts (iPad).
+    activationConstraint: { delay: 250, tolerance: 8 },
   });
   const keyboardSensor = useSensor(KeyboardSensor);
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);

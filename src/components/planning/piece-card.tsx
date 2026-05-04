@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
 import { deletePieceAction } from "@/app/actions/piece-actions";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface PieceCardProps {
   piece: Piece;
@@ -65,6 +66,7 @@ export function PieceCard({
     id: piece.id,
   });
   const [isDeleting, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
@@ -77,22 +79,29 @@ export function PieceCard({
     e.stopPropagation();
     e.preventDefault();
     if (isOverlay) return;
-    const ok = window.confirm(
-      `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`
-    );
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set("id", piece.id);
-    fd.set("project_id", piece.project_id);
+    // Open the accessible confirm dialog. The action runs inside onConfirm
+    // so the dialog handles its own loading + inline error state. The outer
+    // useTransition still wraps the call to keep the card's toolbar spinner
+    // visible while the server action is in flight.
     startDeleteTransition(async () => {
-      const result = await deletePieceAction(fd);
-      if (!result.success) {
-        window.alert(
-          `Não foi possível eliminar a peça: ${result.error ?? "erro desconhecido"}`
-        );
-        return;
-      }
-      onDeleted?.(piece.id);
+      await confirm({
+        title: "Eliminar peça",
+        description: `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`,
+        confirmLabel: "Eliminar",
+        cancelLabel: "Cancelar",
+        tone: "destructive",
+        onConfirm: async () => {
+          const fd = new FormData();
+          fd.set("id", piece.id);
+          fd.set("project_id", piece.project_id);
+          const result = await deletePieceAction(fd);
+          if (!result.success) {
+            // Throw so the dialog stays open and renders the error inline.
+            throw new Error(result.error ?? "Erro desconhecido.");
+          }
+          onDeleted?.(piece.id);
+        },
+      });
     });
   }
 
@@ -153,19 +162,51 @@ export function PieceCard({
     <div
       ref={!isOverlay ? setNodeRef : undefined}
       style={style}
-      {...(!isOverlay ? { ...listeners, ...attributes } : {})}
       className={`
         group relative bg-[var(--color-surface-card)] rounded-xl
-        cursor-grab active:cursor-grabbing
         min-h-[44px] touch-manipulation select-none
         transition-all duration-150
         ${isDragging ? "opacity-30" : ""}
         ${isOverlay ? "shadow-xl ring-2 ring-[var(--color-brand-400)] rotate-2" : "hover:-translate-y-px hover:shadow-md"}
       `}
     >
-      {/* Left border colored by project */}
+      {/* Drag handle — left rail. Only this element binds dnd-kit listeners,
+          so tapping the card body never starts a drag (cleaner on iPad than
+          long-pressing the whole card). The handle is wide enough (44px) to
+          be a comfortable touch target on a shop-floor tablet. */}
+      {!isOverlay && (
+        <div
+          {...listeners}
+          {...attributes}
+          role="button"
+          aria-label={`Arrastar peça ${piece.reference}`}
+          tabIndex={0}
+          className="absolute left-0 top-0 bottom-0 w-9 md:w-6 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-l-xl hover:bg-zinc-50 active:bg-zinc-100 transition-colors z-[1]"
+          title="Arrastar"
+        >
+          <svg
+            className="w-3.5 h-4 text-zinc-400 group-hover:text-zinc-600"
+            viewBox="0 0 8 16"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            {/* 2-col x 4-row dot grid — universal "drag me" affordance. */}
+            <circle cx="2" cy="2" r="1.2" />
+            <circle cx="6" cy="2" r="1.2" />
+            <circle cx="2" cy="6" r="1.2" />
+            <circle cx="6" cy="6" r="1.2" />
+            <circle cx="2" cy="10" r="1.2" />
+            <circle cx="6" cy="10" r="1.2" />
+            <circle cx="2" cy="14" r="1.2" />
+            <circle cx="6" cy="14" r="1.2" />
+          </svg>
+        </div>
+      )}
+
+      {/* Left border colored by project — sits on top of the handle area.
+          Pointer-events:none so it doesn't intercept taps on the handle. */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl"
+        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl pointer-events-none"
         style={{ backgroundColor: projectColor }}
       />
 
@@ -192,7 +233,7 @@ export function PieceCard({
                 onClick={(e) => handleReorderClick(e, "up")}
                 onPointerDown={handleReorderPointerDown}
                 disabled={!canMoveUp}
-                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
                 title="Subir prioridade"
                 aria-label={`Subir prioridade da peça ${piece.reference}`}
               >
@@ -205,7 +246,7 @@ export function PieceCard({
                 onClick={(e) => handleReorderClick(e, "down")}
                 onPointerDown={handleReorderPointerDown}
                 disabled={!canMoveDown}
-                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
                 title="Descer prioridade"
                 aria-label={`Descer prioridade da peça ${piece.reference}`}
               >
@@ -220,7 +261,7 @@ export function PieceCard({
             onClick={handleDelete}
             onPointerDown={handleDeletePointerDown}
             disabled={isDeleting}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 opacity-40 group-hover:opacity-100 focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
+            className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md text-zinc-400 md:opacity-40 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
             title="Eliminar peça definitivamente"
             aria-label={`Eliminar peça ${piece.reference}`}
           >
@@ -238,10 +279,10 @@ export function PieceCard({
         </div>
       )}
 
-      <div className="pl-4 pr-3 py-3">
+      <div className="pl-11 md:pl-8 pr-3 py-3">
         {/* Row 1: Reference + urgency + program status */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
+          <span className="text-[14px] md:text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
             {piece.reference}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -268,17 +309,17 @@ export function PieceCard({
 
         {/* Row 2: Piece description (what we're welding) */}
         {piece.description && (
-          <p className="text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
+          <p className="text-[13px] md:text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
             {piece.description}
           </p>
         )}
 
         {/* Row 3: Project name */}
-        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
+        <p className="text-[13px] md:text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
 
         {/* Row 4: Material + Weight */}
         {(piece.material || piece.weight_kg != null) && (
-          <div className="flex items-center gap-2 mt-1.5 text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
+          <div className="flex items-center gap-2 mt-1.5 text-[12px] md:text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
             {piece.material && (
               <span className="truncate">{piece.material}</span>
             )}
@@ -292,12 +333,12 @@ export function PieceCard({
         {/* Row 5: Metadata pills */}
         <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'var(--color-line-soft)' }}>
           {robotName && (
-            <span className="inline-flex items-center text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
+            <span className="inline-flex items-center text-[12px] md:text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
               {robotName}
             </span>
           )}
           {deadlineInfo && (
-            <span className={`inline-flex items-center text-[10px] font-medium ${deadlineInfo.color} bg-zinc-50 rounded-full px-2 py-0.5`}>
+            <span className={`inline-flex items-center text-[12px] md:text-[10px] font-medium ${deadlineInfo.color} bg-zinc-50 rounded-full px-2 py-0.5`}>
               {deadlineInfo.label}
             </span>
           )}

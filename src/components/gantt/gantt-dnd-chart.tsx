@@ -471,7 +471,7 @@ function DraggableRangeBlock({
           e.preventDefault();
           onDelete(piece.id);
         }}
-        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-[46]"
+        className="absolute top-1 right-1 w-11 h-11 md:w-6 md:h-6 rounded-full bg-red-600/90 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center shadow-md opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity z-[46]"
         aria-label={`Remover ${piece.reference} do calendario`}
         title="Remover do calendario"
       >
@@ -681,7 +681,8 @@ export function GanttDndChart({
     activationConstraint: { distance: 8 },
   });
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 200, tolerance: 8 },
+    // 250ms long-press before drag starts (iPad).
+    activationConstraint: { delay: 250, tolerance: 8 },
   });
   const keyboardSensor = useSensor(KeyboardSensor);
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);

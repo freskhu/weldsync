@@ -2,10 +2,16 @@
 
 import { useMemo, useState } from "react";
 import type { Piece, PlanningWindow, Robot } from "@/lib/types";
-import { ViewSwitcher, type CalendarView } from "./view-switcher";
+import {
+  ViewSwitcher,
+  MobileCalendarTabs,
+  type CalendarView,
+  type MobileTab,
+} from "./view-switcher";
 import { GanttDndChart } from "@/components/gantt/gantt-dnd-chart";
 import { WeekView } from "./week-view";
 import { DayView } from "./day-view";
+import { WeekOverview } from "./week-overview";
 import { UnplannedSidebar } from "./unplanned-sidebar";
 
 interface CalendarViewsProps {
@@ -24,7 +30,10 @@ export function CalendarViews({
   projectMap,
   planningWindow,
 }: CalendarViewsProps) {
+  // Desktop view state (Gantt default)
   const [view, setView] = useState<CalendarView>("gantt");
+  // Mobile tab state (Today default)
+  const [mobileTab, setMobileTab] = useState<MobileTab>("today");
 
   const robotMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -34,13 +43,48 @@ export function CalendarViews({
 
   return (
     <div className="flex flex-col h-full">
-      {/* View switcher */}
+      {/* View switchers — desktop and mobile show different controls */}
       <div className="flex items-center gap-4 mb-4 flex-shrink-0">
         <ViewSwitcher currentView={view} onViewChange={setView} />
+        <MobileCalendarTabs
+          currentTab={mobileTab}
+          onTabChange={setMobileTab}
+        />
       </div>
 
-      {/* Active view */}
-      <div className="flex-1 min-h-0">
+      {/* Mobile views (visible <md — phones). On md+ (iPad portrait and up)
+          the desktop views are visible and richer; the unplanned sidebar
+          appears as a drawer on md..lg and persistent on lg+. */}
+      <div className="flex-1 min-h-0 md:hidden">
+        {mobileTab === "today" && (
+          <DayView
+            key="mobile-today"
+            pieces={pieces}
+            robots={robots}
+            projectMap={projectMap}
+            initialDate={new Date()}
+          />
+        )}
+        {mobileTab === "tomorrow" && (
+          <DayView
+            key="mobile-tomorrow"
+            pieces={pieces}
+            robots={robots}
+            projectMap={projectMap}
+            initialDate={addDays(new Date(), 1)}
+          />
+        )}
+        {mobileTab === "week" && (
+          <WeekOverview
+            pieces={pieces}
+            robots={robots}
+            projectMap={projectMap}
+          />
+        )}
+      </div>
+
+      {/* Desktop / tablet views (visible md+) */}
+      <div className="flex-1 min-h-0 hidden md:block">
         {view === "gantt" && (
           <GanttDndChart
             pieces={pieces}
@@ -73,4 +117,10 @@ export function CalendarViews({
       </div>
     </div>
   );
+}
+
+function addDays(d: Date, n: number): Date {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + n);
+  return copy;
 }
