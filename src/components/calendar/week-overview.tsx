@@ -45,6 +45,29 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
+// ---------------------------------------------------------------------------
+// Range helpers (parity with Gantt / WeekView / DayView)
+// ---------------------------------------------------------------------------
+// Mobile is lenient: a programmed piece is shown on EVERY day its planned
+// range covers (no AM/PM split). The operator on iPhone needs to see what
+// is happening this week — period granularity is noise on a small screen.
+
+function dateUTC(dateStr: string): number {
+  return Date.UTC(
+    parseInt(dateStr.slice(0, 4), 10),
+    parseInt(dateStr.slice(5, 7), 10) - 1,
+    parseInt(dateStr.slice(8, 10), 10),
+  );
+}
+
+function dayInPlannedRange(piece: Piece, dateStr: string): boolean {
+  if (!piece.planned_start_date || !piece.planned_end_date) return false;
+  const target = dateUTC(dateStr);
+  const start = dateUTC(piece.planned_start_date);
+  const end = dateUTC(piece.planned_end_date);
+  return target >= start && target <= end;
+}
+
 export function WeekOverview({
   pieces,
   robots,
@@ -89,6 +112,36 @@ export function WeekOverview({
     }
     return map;
   }, [pieces]);
+
+  // Programmed pieces (range-planned, not yet slot-allocated) by visible day.
+  // Any piece whose [planned_start_date, planned_end_date] inclusive interval
+  // contains the day is shown — mobile is lenient on purpose so the operator
+  // sees the full week's scope.
+  const programmedByDate = useMemo(() => {
+    const map = new Map<string, Piece[]>();
+    const visibleDates = new Set<string>();
+    let cursor = weekStart;
+    for (let i = 0; i < 7; i++) {
+      visibleDates.add(formatDateISO(cursor));
+      cursor = addDays(cursor, 1);
+    }
+    const ranged = pieces.filter(
+      (p) =>
+        p.robot_id != null &&
+        p.planned_start_date != null &&
+        p.planned_end_date != null,
+    );
+    for (const p of ranged) {
+      for (const date of visibleDates) {
+        if (dayInPlannedRange(p, date)) {
+          const list = map.get(date) ?? [];
+          list.push(p);
+          map.set(date, list);
+        }
+      }
+    }
+    return map;
+  }, [pieces, weekStart]);
 
   const prevWeek = useCallback(
     () => setWeekStart((prev) => addDays(prev, -7)),
@@ -136,6 +189,8 @@ export function WeekOverview({
           const dayPieces = piecesByDate.get(day.date) ?? [];
           const am = dayPieces.filter((p) => p.scheduled_period === "AM");
           const pm = dayPieces.filter((p) => p.scheduled_period === "PM");
+          const programmed = programmedByDate.get(day.date) ?? [];
+          const totalCount = dayPieces.length + programmed.length;
 
           return (
             <div
@@ -167,11 +222,11 @@ export function WeekOverview({
                   )}
                 </div>
                 <span className="text-xs text-zinc-500">
-                  {dayPieces.length} {dayPieces.length === 1 ? "peça" : "peças"}
+                  {totalCount} {totalCount === 1 ? "peça" : "peças"}
                 </span>
               </div>
 
-              {dayPieces.length === 0 ? (
+              {totalCount === 0 ? (
                 <div className="px-3 py-4 text-sm text-zinc-400 italic">
                   Sem peças agendadas
                 </div>
@@ -193,7 +248,72 @@ export function WeekOverview({
                       robotMap={robotMap}
                     />
                   )}
+                  {programmed.length > 0 && (
+                    <ProgrammedGroup
+                      pieces={programmed}
+                      projectMap={projectMap}
+                      robotMap={robotMap}
+                    />
+                  )}
                 </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProgrammedGroup({
+  pieces,
+  projectMap,
+  robotMap,
+}: {
+  pieces: Piece[];
+  projectMap: Record<string, { name: string; color: string }>;
+  robotMap: Record<number, string>;
+}) {
+  return (
+    <div>
+      <span className="text-[11px] font-semibold uppercase text-zinc-500 tracking-wide">
+        Programadas
+      </span>
+      <div className="mt-1 space-y-1">
+        {pieces.map((p) => {
+          const project = projectMap[p.project_id];
+          const color = project?.color ?? "#6B7280";
+          const robot = p.robot_id != null ? robotMap[p.robot_id] : null;
+          return (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 min-h-[44px] border border-dashed border-white/70"
+              style={{
+                backgroundImage: `repeating-linear-gradient(45deg, ${color} 0 8px, ${color}99 8px 16px)`,
+                opacity: 0.7,
+              }}
+              title={`Programada (${p.planned_start_date} → ${p.planned_end_date})`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-bold text-white truncate">
+                    {p.reference}
+                  </span>
+                  <span className="text-[9px] uppercase font-semibold text-white/90 bg-black/25 rounded px-1.5 py-0.5 flex-shrink-0">
+                    Programada
+                  </span>
+                  {p.urgent && (
+                    <span className="w-2 h-2 rounded-full bg-white/90 flex-shrink-0" />
+                  )}
+                </div>
+                <div className="text-[12px] text-white/85 truncate">
+                  {project?.name ?? ""}
+                </div>
+              </div>
+              {robot && (
+                <span className="text-[11px] font-semibold text-white/90 bg-black/25 rounded px-2 py-0.5 flex-shrink-0">
+                  {robot}
+                </span>
               )}
             </div>
           );
