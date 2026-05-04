@@ -120,7 +120,11 @@ export default async function PlanningPage({
           />
         </>
       ) : (
-        <ManualWeldList pieces={pieces} projectMap={projectMap} />
+        <ManualWeldList
+          pieces={pieces}
+          projectMap={projectMap}
+          robots={robots}
+        />
       )}
     </div>
   );

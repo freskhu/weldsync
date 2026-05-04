@@ -716,6 +716,156 @@ export async function markPieceAsManualWeldAction(
   return { success: true };
 }
 
+/**
+ * Reverts a piece from "manual_weld" back to "planned".
+ * Used when the operator marked a piece as welded by hand by mistake (or the
+ * shop changed its mind) and wants the piece to go back into the planning
+ * column awaiting a robot assignment.
+ *
+ * Only valid from "manual_weld". Clears every field that was wiped on the way
+ * in (robot, scheduled_*, planned_*) and re-assigns a fresh priority slot in
+ * the planned column. Mirrors the entry-side semantics of movePieceAction.
+ */
+export async function revertManualWeldToPlannedAction(
+  pieceId: string
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
+  if (before.status !== "manual_weld") {
+    return {
+      success: false,
+      error:
+        "Só é possível reverter peças que estejam em Soldadura Manual.",
+    };
+  }
+
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  let priority: number;
+  try {
+    priority = await nextPlannedPriority();
+  } catch (err) {
+    console.error(
+      "[revertManualWeldToPlannedAction] nextPlannedPriority failed:",
+      err instanceof Error ? err.message : String(err)
+    );
+    return { success: false, error: "Falha ao calcular prioridade." };
+  }
+
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    status: "planned",
+    robot_id: null,
+    scheduled_date: null,
+    scheduled_period: null,
+    planned_start_date: null,
+    planned_end_date: null,
+    planned_start_period: null,
+    planned_end_period: null,
+    priority,
+    ...statusAuditPatch(userId),
+  };
+
+  let piece;
+  try {
+    piece = await dbUpdatePiece(pieceId, patch);
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
+
+  revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
+/**
+ * Reverts a piece from "manual_weld" back to "programmed", assigning a robot.
+ * Used when the operator marked a piece as welded by hand by mistake but the
+ * piece was actually programmed on a station — the operator picks the robot
+ * and the piece returns to the programmed state.
+ *
+ * Only valid from "manual_weld" with a valid robotId. Mirrors the semantics of
+ * programPieceWithRobotAction (status + robot_id, priority cleared, dates
+ * untouched — they were already null in manual_weld).
+ */
+export async function revertManualWeldToProgrammedAction(
+  pieceId: string,
+  robotId: number
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+  if (!Number.isInteger(robotId) || robotId <= 0) {
+    return { success: false, error: "Robot invalido." };
+  }
+
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
+  if (before.status !== "manual_weld") {
+    return {
+      success: false,
+      error:
+        "Só é possível reverter peças que estejam em Soldadura Manual.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Validate robot exists. RLS already protects writes, but a friendly error
+  // here beats a foreign-key failure surfaced as "Erro inesperado".
+  const { data: robot, error: robotErr } = await supabase
+    .from("robots")
+    .select("id")
+    .eq("id", robotId)
+    .maybeSingle();
+  if (robotErr) {
+    console.error(
+      "[revertManualWeldToProgrammedAction] robot lookup failed:",
+      robotErr.message
+    );
+    return { success: false, error: "Falha ao validar robot." };
+  }
+  if (!robot) {
+    return { success: false, error: "Robot nao encontrado." };
+  }
+
+  const userId = await getCurrentUserId(supabase);
+
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    status: "programmed",
+    robot_id: robotId,
+    priority: null,
+    ...statusAuditPatch(userId),
+  };
+
+  let piece;
+  try {
+    piece = await dbUpdatePiece(pieceId, patch);
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
+
+  revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
 // --- Planned priority reorder (▲▼ arrows on Planeados column) ---
 
 async function reorderPlanned(

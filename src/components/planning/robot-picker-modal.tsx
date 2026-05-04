@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { Robot, Piece } from "@/lib/types";
 import { programPieceWithRobotAction } from "@/app/actions/piece-actions";
+import type { ActionResult } from "@/app/actions/piece-actions";
 
 interface RobotPickerModalProps {
   piece: Piece;
@@ -11,12 +12,26 @@ interface RobotPickerModalProps {
   initialRobotId?: number | null;
   onConfirm: (robotId: number) => void;
   onCancel: () => void;
+  /**
+   * Optional override for which server action to invoke on confirm.
+   * Defaults to programPieceWithRobotAction (kanban "Programada" drop).
+   * Other call-sites (e.g. revert manual_weld -> programmed) pass their own.
+   */
+  submitAction?: (pieceId: string, robotId: number) => Promise<ActionResult>;
+  /** Optional override for header copy. */
+  title?: string;
+  prompt?: string;
+  confirmLabel?: string;
+  pendingLabel?: string;
 }
 
 /**
  * Modal shown when a piece is dropped into the "Programada" column.
  * Asks the user which robot was programmed. Persists status + robot_id
  * atomically via programPieceWithRobotAction. Does not touch dates.
+ *
+ * Reusable: callers can pass `submitAction` to invoke a different server
+ * action (e.g. revertManualWeldToProgrammedAction) with the same UX.
  */
 export function RobotPickerModal({
   piece,
@@ -24,6 +39,11 @@ export function RobotPickerModal({
   initialRobotId,
   onConfirm,
   onCancel,
+  submitAction,
+  title,
+  prompt,
+  confirmLabel,
+  pendingLabel,
 }: RobotPickerModalProps) {
   const [selectedRobot, setSelectedRobot] = useState<number | null>(
     initialRobotId ?? null
@@ -31,11 +51,13 @@ export function RobotPickerModal({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const action = submitAction ?? programPieceWithRobotAction;
+
   function handleConfirm() {
     if (!selectedRobot) return;
     setError(null);
     startTransition(async () => {
-      const result = await programPieceWithRobotAction(piece.id, selectedRobot);
+      const result = await action(piece.id, selectedRobot);
       if (result.success) {
         onConfirm(selectedRobot);
       } else {
@@ -50,13 +72,13 @@ export function RobotPickerModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200">
           <h2 className="text-lg font-semibold text-zinc-900">
-            Programar — {piece.reference}
+            {title ?? `Programar — ${piece.reference}`}
           </h2>
           <p className="text-sm text-zinc-500 mt-0.5">
             {piece.description ?? "Sem descrição"}
           </p>
           <p className="text-xs text-zinc-500 mt-1">
-            Em que robot foi programada esta peça?
+            {prompt ?? "Em que robot foi programada esta peça?"}
           </p>
         </div>
 
@@ -114,7 +136,9 @@ export function RobotPickerModal({
             disabled={!selectedRobot || isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] transition-colors"
           >
-            {isPending ? "A programar..." : "Confirmar"}
+            {isPending
+              ? (pendingLabel ?? "A programar...")
+              : (confirmLabel ?? "Confirmar")}
           </button>
         </div>
       </div>
