@@ -55,7 +55,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col lg:flex-row">
         <Sidebar user={sidebarUser} />
         <main
-          className="flex-1 min-h-screen"
+          className="flex-1 min-h-[100dvh]"
           style={{ backgroundColor: "var(--color-surface-bg)" }}
         >
           {children}

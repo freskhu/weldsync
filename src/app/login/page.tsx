@@ -38,7 +38,7 @@ export default async function LoginPage({
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4 py-10"
+      className="min-h-[100dvh] flex items-center justify-center px-4 py-10"
       style={{ backgroundColor: "var(--color-surface-bg)" }}
     >
       <div className="w-full max-w-md">

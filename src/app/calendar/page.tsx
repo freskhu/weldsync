@@ -30,7 +30,7 @@ export default async function CalendarPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 h-screen flex flex-col">
+    <div className="p-4 md:p-6 h-[100dvh] flex flex-col">
       <div className="flex items-center justify-between mb-4 gap-3">
         <h1 className="text-2xl font-bold text-zinc-900">Calendário</h1>
         <PrintButton

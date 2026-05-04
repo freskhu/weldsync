@@ -224,7 +224,7 @@ export function Sidebar({ user }: { user?: SidebarUser }) {
 
       {/* Desktop sidebar */}
       <aside
-        className="hidden lg:flex w-[260px] min-h-screen flex-col flex-shrink-0"
+        className="hidden lg:flex w-[260px] min-h-[100dvh] flex-col flex-shrink-0"
         style={{ backgroundColor: 'var(--color-surface-sidebar)' }}
       >
         <div className="p-5 border-b border-white/10">
