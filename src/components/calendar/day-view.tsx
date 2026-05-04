@@ -24,6 +24,42 @@ import type { Piece, Robot } from "@/lib/types";
 import { allocatePieceDirectAction } from "@/app/actions/piece-actions";
 
 // ---------------------------------------------------------------------------
+// Half-day slot helpers (parity with Gantt range logic)
+// ---------------------------------------------------------------------------
+// 1 day = 2 half-day slots. AM = morning = 0, PM = afternoon = 1.
+// A planned range spans inclusive [startSlot, endSlot] in absolute slot index.
+
+function slotIndexFromDate(dateStr: string, baseDate: string): number {
+  const a = Date.UTC(
+    parseInt(dateStr.slice(0, 4), 10),
+    parseInt(dateStr.slice(5, 7), 10) - 1,
+    parseInt(dateStr.slice(8, 10), 10),
+  );
+  const b = Date.UTC(
+    parseInt(baseDate.slice(0, 4), 10),
+    parseInt(baseDate.slice(5, 7), 10) - 1,
+    parseInt(baseDate.slice(8, 10), 10),
+  );
+  return Math.round((a - b) / 86_400_000);
+}
+
+function rangeCoversCell(
+  piece: Piece,
+  dateStr: string,
+  period: "AM" | "PM",
+): boolean {
+  if (!piece.planned_start_date || !piece.planned_end_date) return false;
+  const dayDelta = slotIndexFromDate(dateStr, piece.planned_start_date);
+  const endDelta = slotIndexFromDate(piece.planned_end_date, piece.planned_start_date);
+  if (dayDelta < 0 || dayDelta > endDelta) return false;
+  const cellSlot = dayDelta * 2 + (period === "AM" ? 0 : 1);
+  const startSlot = (piece.planned_start_period ?? "morning") === "morning" ? 0 : 1;
+  const endSlot =
+    endDelta * 2 + ((piece.planned_end_period ?? "afternoon") === "morning" ? 0 : 1);
+  return cellSlot >= startSlot && cellSlot <= endSlot;
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -160,6 +196,49 @@ function DraggablePieceBlock({
 }
 
 // ---------------------------------------------------------------------------
+// Range Piece Block (read-only, "programmed" range visualization)
+// ---------------------------------------------------------------------------
+
+function RangePieceBlock({
+  piece,
+  color,
+  projectName,
+}: {
+  piece: Piece;
+  color: string;
+  projectName: string;
+}) {
+  const style: React.CSSProperties = {
+    backgroundImage: `repeating-linear-gradient(45deg, ${color} 0 8px, ${color}99 8px 16px)`,
+    opacity: 0.6,
+  };
+  return (
+    <div
+      className="rounded-lg px-3 py-2 select-none touch-manipulation min-h-[44px] border border-dashed border-white/70 cursor-default"
+      style={style}
+      title={`${piece.reference} — ${projectName}\nProgramada (range planeado ${piece.planned_start_date} → ${piece.planned_end_date})`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-bold text-white truncate">
+          {piece.reference}
+        </span>
+        <span className="text-[9px] uppercase font-semibold text-white/85 bg-black/25 rounded px-1.5 py-0.5 flex-shrink-0">
+          Programada
+        </span>
+      </div>
+      <span className="text-xs text-white/85 truncate block">
+        {projectName}
+      </span>
+      <div className="flex gap-2 mt-1 text-[10px] text-white/70">
+        {piece.description && (
+          <span className="truncate max-w-[150px]">{piece.description}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Overlay Block
 // ---------------------------------------------------------------------------
 
@@ -275,6 +354,30 @@ export function DayView({
     }
     return map;
   }, [dayPieces]);
+
+  // Programmed pieces: robot assigned + planned range defined, but no
+  // concrete scheduled_date/scheduled_period yet. Mirrors the Gantt's
+  // plannedRangePieces filter so Day view reaches feature parity.
+  const rangePiecesByCell = useMemo(() => {
+    const map = new Map<string, Piece[]>();
+    const ranged = pieces.filter(
+      (p) =>
+        p.robot_id !== null &&
+        p.planned_start_date !== null &&
+        p.planned_end_date !== null,
+    );
+    for (const p of ranged) {
+      for (const period of ["AM", "PM"] as const) {
+        if (rangeCoversCell(p, dateStr, period)) {
+          const key = `${p.robot_id}-${period}`;
+          const list = map.get(key) ?? [];
+          list.push(p);
+          map.set(key, list);
+        }
+      }
+    }
+    return map;
+  }, [pieces, dateStr]);
 
   // Sensors
   const mouseSensor = useSensor(MouseSensor, {
@@ -444,6 +547,7 @@ export function DayView({
             {robots.map((robot) => {
               const key = `${robot.id}-AM`;
               const pcs = cellPieces.get(key) ?? [];
+              const range = rangePiecesByCell.get(key) ?? [];
               return (
                 <DroppableCell
                   key={`am-${robot.id}`}
@@ -458,6 +562,14 @@ export function DayView({
                       projectName={projectMap[piece.project_id]?.name ?? ""}
                     />
                   ))}
+                  {range.map((piece) => (
+                    <RangePieceBlock
+                      key={`r-${piece.id}`}
+                      piece={piece}
+                      color={projectMap[piece.project_id]?.color ?? "#6B7280"}
+                      projectName={projectMap[piece.project_id]?.name ?? ""}
+                    />
+                  ))}
                 </DroppableCell>
               );
             })}
@@ -466,6 +578,7 @@ export function DayView({
             {robots.map((robot) => {
               const key = `${robot.id}-PM`;
               const pcs = cellPieces.get(key) ?? [];
+              const range = rangePiecesByCell.get(key) ?? [];
               return (
                 <DroppableCell
                   key={`pm-${robot.id}`}
@@ -475,6 +588,14 @@ export function DayView({
                   {pcs.map((piece) => (
                     <DraggablePieceBlock
                       key={piece.id}
+                      piece={piece}
+                      color={projectMap[piece.project_id]?.color ?? "#6B7280"}
+                      projectName={projectMap[piece.project_id]?.name ?? ""}
+                    />
+                  ))}
+                  {range.map((piece) => (
+                    <RangePieceBlock
+                      key={`r-${piece.id}`}
                       piece={piece}
                       color={projectMap[piece.project_id]?.color ?? "#6B7280"}
                       projectName={projectMap[piece.project_id]?.name ?? ""}

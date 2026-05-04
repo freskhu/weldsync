@@ -24,6 +24,51 @@ import type { Piece, Robot } from "@/lib/types";
 import { allocatePieceDirectAction } from "@/app/actions/piece-actions";
 
 // ---------------------------------------------------------------------------
+// Half-day slot helpers (parity with Gantt range logic)
+// ---------------------------------------------------------------------------
+// 1 day = 2 half-day slots. AM = morning = 0, PM = afternoon = 1.
+// A planned range spans inclusive [startSlot, endSlot] in absolute slot index.
+//
+// startSlot = startDayIndex * 2 + (planned_start_period === "morning" ? 0 : 1)
+// endSlot   = endDayIndex   * 2 + (planned_end_period   === "morning" ? 0 : 1)
+//
+// A given (date, period) cell is covered when its absolute slot index falls
+// inside [startSlot, endSlot]. For days strictly between start and end this
+// always covers both AM and PM, which matches the spec.
+
+function slotIndexFromDate(dateStr: string, baseDate: string): number {
+  // Convert YYYY-MM-DD -> day index relative to a base date, ignoring DST.
+  const a = Date.UTC(
+    parseInt(dateStr.slice(0, 4), 10),
+    parseInt(dateStr.slice(5, 7), 10) - 1,
+    parseInt(dateStr.slice(8, 10), 10),
+  );
+  const b = Date.UTC(
+    parseInt(baseDate.slice(0, 4), 10),
+    parseInt(baseDate.slice(5, 7), 10) - 1,
+    parseInt(baseDate.slice(8, 10), 10),
+  );
+  return Math.round((a - b) / 86_400_000);
+}
+
+function rangeCoversCell(
+  piece: Piece,
+  dateStr: string,
+  period: "AM" | "PM",
+): boolean {
+  if (!piece.planned_start_date || !piece.planned_end_date) return false;
+  const dayDelta = slotIndexFromDate(dateStr, piece.planned_start_date);
+  const endDelta = slotIndexFromDate(piece.planned_end_date, piece.planned_start_date);
+  if (dayDelta < 0 || dayDelta > endDelta) return false;
+  // Convert to absolute half-day slot indices, anchored at planned_start_date.
+  const cellSlot = dayDelta * 2 + (period === "AM" ? 0 : 1);
+  const startSlot = (piece.planned_start_period ?? "morning") === "morning" ? 0 : 1;
+  const endSlot =
+    endDelta * 2 + ((piece.planned_end_period ?? "afternoon") === "morning" ? 0 : 1);
+  return cellSlot >= startSlot && cellSlot <= endSlot;
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -124,6 +169,49 @@ function DraggablePieceBlock({
       className="rounded px-1.5 py-1 cursor-grab active:cursor-grabbing select-none touch-manipulation min-h-[44px] flex flex-col justify-center mb-1 hover:brightness-95 transition-all"
       style={style}
       title={`${piece.reference} — ${projectName}\n${piece.description ?? ""}`}
+    >
+      <span className="text-[11px] font-semibold text-white truncate leading-tight">
+        {piece.reference}
+      </span>
+      {!compact && (
+        <span className="text-[9px] text-white/80 truncate leading-tight">
+          {projectName}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Range Piece Block (read-only, "programmed" range visualization)
+// ---------------------------------------------------------------------------
+// Programmed pieces have a robot + planned date range but no concrete slot
+// allocation yet. We surface them in the calendar grid for parity with Gantt:
+// distinct visual treatment (striped, dashed border, lower opacity) and not
+// draggable — operator must allocate them via the Gantt or kanban first.
+
+function RangePieceBlock({
+  piece,
+  color,
+  projectName,
+  compact,
+}: {
+  piece: Piece;
+  color: string;
+  projectName: string;
+  compact?: boolean;
+}) {
+  // Diagonal stripe pattern over the project color for unmistakable
+  // "not yet allocated" semantics.
+  const style: React.CSSProperties = {
+    backgroundImage: `repeating-linear-gradient(45deg, ${color} 0 6px, ${color}99 6px 12px)`,
+    opacity: 0.55,
+  };
+  return (
+    <div
+      className="rounded px-1.5 py-1 select-none touch-manipulation min-h-[44px] flex flex-col justify-center mb-1 border border-dashed border-white/70 cursor-default"
+      style={style}
+      title={`${piece.reference} — ${projectName}\nProgramada (range planeado ${piece.planned_start_date} → ${piece.planned_end_date})`}
     >
       <span className="text-[11px] font-semibold text-white truncate leading-tight">
         {piece.reference}
@@ -263,6 +351,33 @@ export function WeekView({
     }
     return map;
   }, [scheduledPieces]);
+
+  // Programmed pieces: robot assigned + planned range defined, but no
+  // concrete scheduled_date/scheduled_period yet. Mirrors the Gantt's
+  // plannedRangePieces filter so Day/Week views reach feature parity.
+  const rangePiecesByCell = useMemo(() => {
+    const map = new Map<string, Piece[]>();
+    const visibleDates = weekDays.map((d) => d.date);
+    const ranged = pieces.filter(
+      (p) =>
+        p.robot_id !== null &&
+        p.planned_start_date !== null &&
+        p.planned_end_date !== null,
+    );
+    for (const p of ranged) {
+      for (const date of visibleDates) {
+        for (const period of ["AM", "PM"] as const) {
+          if (rangeCoversCell(p, date, period)) {
+            const key = `${p.robot_id}-${date}-${period}`;
+            const list = map.get(key) ?? [];
+            list.push(p);
+            map.set(key, list);
+          }
+        }
+      }
+    }
+    return map;
+  }, [pieces, weekDays]);
 
   // Sensors
   const mouseSensor = useSensor(MouseSensor, {
@@ -448,6 +563,8 @@ export function WeekView({
                     const pmKey = `${robot.id}-${day.date}-PM`;
                     const amPieces = cellPieces.get(amKey) ?? [];
                     const pmPieces = cellPieces.get(pmKey) ?? [];
+                    const amRange = rangePiecesByCell.get(amKey) ?? [];
+                    const pmRange = rangePiecesByCell.get(pmKey) ?? [];
                     return (
                       <td
                         key={day.date}
@@ -473,6 +590,15 @@ export function WeekView({
                                 compact
                               />
                             ))}
+                            {amRange.map((piece) => (
+                              <RangePieceBlock
+                                key={`r-${piece.id}`}
+                                piece={piece}
+                                color={projectMap[piece.project_id]?.color ?? "#6B7280"}
+                                projectName={projectMap[piece.project_id]?.name ?? ""}
+                                compact
+                              />
+                            ))}
                           </DroppableCell>
                         </div>
                         {/* PM slot */}
@@ -487,6 +613,15 @@ export function WeekView({
                             {pmPieces.map((piece) => (
                               <DraggablePieceBlock
                                 key={piece.id}
+                                piece={piece}
+                                color={projectMap[piece.project_id]?.color ?? "#6B7280"}
+                                projectName={projectMap[piece.project_id]?.name ?? ""}
+                                compact
+                              />
+                            ))}
+                            {pmRange.map((piece) => (
+                              <RangePieceBlock
+                                key={`r-${piece.id}`}
                                 piece={piece}
                                 color={projectMap[piece.project_id]?.color ?? "#6B7280"}
                                 projectName={projectMap[piece.project_id]?.name ?? ""}
