@@ -6,6 +6,7 @@ import { useDndMonitor, useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
 import { textOn, mutedTextOn } from "@/lib/color-utils";
 import { deletePieceAction } from "@/app/actions/piece-actions";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Unplanned Sidebar — left rail on the Gantt view listing pieces that have
@@ -52,6 +53,7 @@ function UnplannedCard({
 }: UnplannedCardProps) {
   const router = useRouter();
   const [isDeleting, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: sidebarDragIdFor(piece.id),
@@ -82,22 +84,27 @@ function UnplannedCard({
   function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     e.preventDefault();
-    const ok = window.confirm(
-      `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`
-    );
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set("id", piece.id);
-    fd.set("project_id", piece.project_id);
+    // Accessible confirm dialog. Action runs inside onConfirm so the dialog
+    // owns the loading + inline error state. The wrapping useTransition keeps
+    // the card's delete-button spinner alive while the server action runs.
     startDeleteTransition(async () => {
-      const result = await deletePieceAction(fd);
-      if (!result.success) {
-        window.alert(
-          `Não foi possível eliminar a peça: ${result.error ?? "erro desconhecido"}`
-        );
-        return;
-      }
-      router.refresh();
+      await confirm({
+        title: "Eliminar peça",
+        description: `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`,
+        confirmLabel: "Eliminar",
+        cancelLabel: "Cancelar",
+        tone: "destructive",
+        onConfirm: async () => {
+          const fd = new FormData();
+          fd.set("id", piece.id);
+          fd.set("project_id", piece.project_id);
+          const result = await deletePieceAction(fd);
+          if (!result.success) {
+            throw new Error(result.error ?? "Erro desconhecido.");
+          }
+          router.refresh();
+        },
+      });
     });
   }
 

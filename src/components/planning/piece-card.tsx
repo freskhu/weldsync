@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
 import { deletePieceAction } from "@/app/actions/piece-actions";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface PieceCardProps {
   piece: Piece;
@@ -65,6 +66,7 @@ export function PieceCard({
     id: piece.id,
   });
   const [isDeleting, startDeleteTransition] = useTransition();
+  const confirm = useConfirm();
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
@@ -77,22 +79,29 @@ export function PieceCard({
     e.stopPropagation();
     e.preventDefault();
     if (isOverlay) return;
-    const ok = window.confirm(
-      `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`
-    );
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set("id", piece.id);
-    fd.set("project_id", piece.project_id);
+    // Open the accessible confirm dialog. The action runs inside onConfirm
+    // so the dialog handles its own loading + inline error state. The outer
+    // useTransition still wraps the call to keep the card's toolbar spinner
+    // visible while the server action is in flight.
     startDeleteTransition(async () => {
-      const result = await deletePieceAction(fd);
-      if (!result.success) {
-        window.alert(
-          `Não foi possível eliminar a peça: ${result.error ?? "erro desconhecido"}`
-        );
-        return;
-      }
-      onDeleted?.(piece.id);
+      await confirm({
+        title: "Eliminar peça",
+        description: `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`,
+        confirmLabel: "Eliminar",
+        cancelLabel: "Cancelar",
+        tone: "destructive",
+        onConfirm: async () => {
+          const fd = new FormData();
+          fd.set("id", piece.id);
+          fd.set("project_id", piece.project_id);
+          const result = await deletePieceAction(fd);
+          if (!result.success) {
+            // Throw so the dialog stays open and renders the error inline.
+            throw new Error(result.error ?? "Erro desconhecido.");
+          }
+          onDeleted?.(piece.id);
+        },
+      });
     });
   }
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
@@ -53,13 +54,15 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col lg:flex-row">
-        <Sidebar user={sidebarUser} />
-        <main
-          className="flex-1 min-h-[100dvh]"
-          style={{ backgroundColor: "var(--color-surface-bg)" }}
-        >
-          {children}
-        </main>
+        <ConfirmDialogProvider>
+          <Sidebar user={sidebarUser} />
+          <main
+            className="flex-1 min-h-[100dvh]"
+            style={{ backgroundColor: "var(--color-surface-bg)" }}
+          >
+            {children}
+          </main>
+        </ConfirmDialogProvider>
       </body>
     </html>
   );
