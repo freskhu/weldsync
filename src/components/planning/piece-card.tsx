@@ -1,8 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { Piece } from "@/lib/types";
 import {
   deletePieceAction,
@@ -69,7 +68,6 @@ export function PieceCard({
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: piece.id,
   });
-  const [isDeleting, startDeleteTransition] = useTransition();
   const confirm = useConfirm();
 
   const style = transform
@@ -78,15 +76,16 @@ export function PieceCard({
 
   const deadlineInfo = getDeadlineInfo(piece.scheduled_date);
 
-  function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
+  async function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
     // Prevent dnd-kit from interpreting this as the start of a drag.
     e.stopPropagation();
     e.preventDefault();
     if (isOverlay) return;
-    // Open the accessible confirm dialog. The action runs inside onConfirm
-    // so the dialog handles its own loading + inline error state. The outer
-    // useTransition still wraps the call to keep the card's toolbar spinner
-    // visible while the server action is in flight.
+    // The dialog has its own busy + inline error state, so we open it
+    // directly. Wrapping confirm() in a React 19 transition would batch the
+    // dialog's setState until the transition resolves — and the transition
+    // only resolves when the user clicks a button on the dialog that never
+    // rendered. Classic deadlock; do NOT use startTransition here.
     //
     // Manual-weld escape hatch: when the piece is already planned or
     // programmed, the shop floor sometimes decides to weld by hand. Show a
@@ -96,41 +95,39 @@ export function PieceCard({
     const offerManualWeld =
       piece.status === "planned" || piece.status === "programmed";
 
-    startDeleteTransition(async () => {
-      await confirm({
-        title: "Eliminar peça",
-        description: `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`,
-        confirmLabel: "Eliminar",
-        cancelLabel: "Cancelar",
-        tone: "destructive",
-        onConfirm: async () => {
-          const fd = new FormData();
-          fd.set("id", piece.id);
-          fd.set("project_id", piece.project_id);
-          const result = await deletePieceAction(fd);
-          if (!result.success) {
-            // Throw so the dialog stays open and renders the error inline.
-            throw new Error(result.error ?? "Erro desconhecido.");
+    await confirm({
+      title: "Eliminar peça",
+      description: `Eliminar peça "${piece.reference}" definitivamente? Esta acção não pode ser revertida.`,
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cancelar",
+      tone: "destructive",
+      onConfirm: async () => {
+        const fd = new FormData();
+        fd.set("id", piece.id);
+        fd.set("project_id", piece.project_id);
+        const result = await deletePieceAction(fd);
+        if (!result.success) {
+          // Throw so the dialog stays open and renders the error inline.
+          throw new Error(result.error ?? "Erro desconhecido.");
+        }
+        onDeleted?.(piece.id);
+      },
+      alternate: offerManualWeld
+        ? {
+            label: "Soldar à mão",
+            tone: "default",
+            onAction: async () => {
+              const result = await markPieceAsManualWeldAction(piece.id);
+              if (!result.success) {
+                throw new Error(result.error ?? "Erro desconhecido.");
+              }
+              // Treat as a "removal" from the current view: the piece is
+              // no longer planned/programmed and parent kanban filters by
+              // those statuses. Keeps optimistic UI consistent.
+              onDeleted?.(piece.id);
+            },
           }
-          onDeleted?.(piece.id);
-        },
-        alternate: offerManualWeld
-          ? {
-              label: "Soldar à mão",
-              tone: "default",
-              onAction: async () => {
-                const result = await markPieceAsManualWeldAction(piece.id);
-                if (!result.success) {
-                  throw new Error(result.error ?? "Erro desconhecido.");
-                }
-                // Treat as a "removal" from the current view: the piece is
-                // no longer planned/programmed and parent kanban filters by
-                // those statuses. Keeps optimistic UI consistent.
-                onDeleted?.(piece.id);
-              },
-            }
-          : undefined,
-      });
+        : undefined,
     });
   }
 
@@ -289,16 +286,11 @@ export function PieceCard({
             type="button"
             onClick={handleDelete}
             onPointerDown={handleDeletePointerDown}
-            disabled={isDeleting}
             className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md text-zinc-400 md:opacity-40 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
             title="Eliminar peça definitivamente"
             aria-label={`Eliminar peça ${piece.reference}`}
           >
-            {isDeleting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />
-            )}
+            <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
         </div>
       )}
