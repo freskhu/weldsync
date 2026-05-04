@@ -14,9 +14,8 @@ import {
 import { ManualWeldList } from "@/components/planning/manual-weld-list";
 
 interface PlanningPageProps {
-  // App Router serializes searchParams to this shape. Optional because the
-  // default view is the Kanban (no query string).
-  searchParams?: { view?: string };
+  // Next 16 App Router: searchParams is async — must be awaited before use.
+  searchParams?: Promise<{ view?: string }>;
 }
 
 function resolveView(raw: string | undefined): PlanningView {
@@ -26,7 +25,8 @@ function resolveView(raw: string | undefined): PlanningView {
 export default async function PlanningPage({
   searchParams,
 }: PlanningPageProps) {
-  const activeView = resolveView(searchParams?.view);
+  const params = (await searchParams) ?? {};
+  const activeView = resolveView(params.view);
 
   let pieces, projects, robots, planningWindow;
   try {
