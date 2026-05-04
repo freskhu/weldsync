@@ -52,8 +52,10 @@ export function CalendarViews({
         />
       </div>
 
-      {/* Mobile views (visible <lg) */}
-      <div className="flex-1 min-h-0 lg:hidden">
+      {/* Mobile views (visible <md — phones). On md+ (iPad portrait and up)
+          the desktop views are visible and richer; the unplanned sidebar
+          appears as a drawer on md..lg and persistent on lg+. */}
+      <div className="flex-1 min-h-0 md:hidden">
         {mobileTab === "today" && (
           <DayView
             key="mobile-today"
@@ -81,8 +83,8 @@ export function CalendarViews({
         )}
       </div>
 
-      {/* Desktop views (visible lg+) */}
-      <div className="flex-1 min-h-0 hidden lg:block">
+      {/* Desktop / tablet views (visible md+) */}
+      <div className="flex-1 min-h-0 hidden md:block">
         {view === "gantt" && (
           <GanttDndChart
             pieces={pieces}

@@ -16,7 +16,7 @@ const DESKTOP_VIEWS: { id: CalendarView; label: string }[] = [
 
 export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   return (
-    <div className="hidden lg:inline-flex rounded-xl border border-zinc-200 bg-[var(--color-surface-bg)] p-1 shadow-[var(--shadow-xs)]">
+    <div className="hidden md:inline-flex rounded-xl border border-zinc-200 bg-[var(--color-surface-bg)] p-1 shadow-[var(--shadow-xs)]">
       {DESKTOP_VIEWS.map((view) => (
         <button
           key={view.id}
@@ -51,7 +51,7 @@ export function MobileCalendarTabs({
 }: MobileTabsProps) {
   return (
     <div
-      className="lg:hidden flex w-full rounded-xl border border-zinc-200 bg-[var(--color-surface-bg)] p-1 shadow-[var(--shadow-xs)]"
+      className="md:hidden flex w-full rounded-xl border border-zinc-200 bg-[var(--color-surface-bg)] p-1 shadow-[var(--shadow-xs)]"
       role="tablist"
       aria-label="Vista do calendário"
     >
