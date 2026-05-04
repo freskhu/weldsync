@@ -156,7 +156,7 @@ export function PieceTable({ pieces, projectId, clientRef }: PieceTableProps) {
                   key={piece.id}
                   className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition-colors"
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4 md:py-3">
                     <div className="flex items-center gap-2">
                       {piece.urgent && (
                         <span className="inline-block w-2 h-2 rounded-full bg-red-500 flex-shrink-0" title="Urgente" />
@@ -166,31 +166,31 @@ export function PieceTable({ pieces, projectId, clientRef }: PieceTableProps) {
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
+                  <td className="px-4 py-4 md:py-3 hidden md:table-cell">
                     <span className="text-sm text-zinc-600 truncate max-w-[200px] block">
                       {piece.description || "--"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
+                  <td className="px-4 py-4 md:py-3 hidden lg:table-cell">
                     <span className="text-sm text-zinc-600">{piece.material || "--"}</span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-4 md:py-3 text-right">
                     <span className="text-sm text-zinc-700 tabular-nums">{piece.quantity}</span>
                   </td>
-                  <td className="px-4 py-3 text-right hidden md:table-cell">
+                  <td className="px-4 py-4 md:py-3 text-right hidden md:table-cell">
                     <span className="text-sm text-zinc-600 tabular-nums">
                       {piece.weight_kg ? `${piece.weight_kg} kg` : "--"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right hidden md:table-cell">
+                  <td className="px-4 py-4 md:py-3 text-right hidden md:table-cell">
                     <span className="text-sm text-zinc-600 tabular-nums">
                       {piece.estimated_hours ? `${piece.estimated_hours}h` : "--"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-4 md:py-3 text-center">
                     {renderProgramStatus(piece)}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-4 md:py-3 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       piece.status === "completed"
                         ? "bg-green-100 text-green-700"
@@ -209,7 +209,7 @@ export function PieceTable({ pieces, projectId, clientRef }: PieceTableProps) {
                       {piece.status === "completed" && "Concluida"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-4 md:py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"

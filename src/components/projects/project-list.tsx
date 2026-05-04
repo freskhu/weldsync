@@ -57,13 +57,13 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
                   key={project.id}
                   className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50 hover:shadow-[var(--shadow-md)] transition-all duration-150 min-h-[44px]"
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4 md:py-3">
                     <div
                       className="w-3.5 h-3.5 rounded-full ring-2 ring-white shadow-sm"
                       style={{ backgroundColor: project.color }}
                     />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4 md:py-3">
                     <Link
                       href={`/projects/${project.id}`}
                       className="text-sm font-mono text-zinc-600 hover:text-zinc-900"
@@ -71,7 +71,7 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
                       {project.client_ref}
                     </Link>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4 md:py-3">
                     <Link
                       href={`/projects/${project.id}`}
                       className="text-sm font-medium text-zinc-900 hover:text-blue-600"
@@ -79,17 +79,17 @@ export function ProjectList({ projects, pieceCounts }: ProjectListProps) {
                       {project.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
+                  <td className="px-4 py-4 md:py-3 hidden md:table-cell">
                     <span className="text-sm text-zinc-600">{project.client_name}</span>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
+                  <td className="px-4 py-4 md:py-3 hidden md:table-cell">
                     <span className="text-sm text-zinc-600">
                       {project.deadline
                         ? new Date(project.deadline).toLocaleDateString("pt-PT")
                         : "--"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-4 md:py-3 text-right">
                     <span className="text-sm text-zinc-500 tabular-nums">
                       {pieceCounts[project.id] ?? 0}
                     </span>
