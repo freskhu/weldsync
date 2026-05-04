@@ -269,7 +269,8 @@ export function WeekView({
     activationConstraint: { distance: 8 },
   });
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 200, tolerance: 8 },
+    // 250ms long-press before drag starts (iPad).
+    activationConstraint: { delay: 250, tolerance: 8 },
   });
   const keyboardSensor = useSensor(KeyboardSensor);
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);

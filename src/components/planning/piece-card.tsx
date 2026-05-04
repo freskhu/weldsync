@@ -153,19 +153,51 @@ export function PieceCard({
     <div
       ref={!isOverlay ? setNodeRef : undefined}
       style={style}
-      {...(!isOverlay ? { ...listeners, ...attributes } : {})}
       className={`
         group relative bg-[var(--color-surface-card)] rounded-xl
-        cursor-grab active:cursor-grabbing
         min-h-[44px] touch-manipulation select-none
         transition-all duration-150
         ${isDragging ? "opacity-30" : ""}
         ${isOverlay ? "shadow-xl ring-2 ring-[var(--color-brand-400)] rotate-2" : "hover:-translate-y-px hover:shadow-md"}
       `}
     >
-      {/* Left border colored by project */}
+      {/* Drag handle — left rail. Only this element binds dnd-kit listeners,
+          so tapping the card body never starts a drag (cleaner on iPad than
+          long-pressing the whole card). The handle is wide enough (44px) to
+          be a comfortable touch target on a shop-floor tablet. */}
+      {!isOverlay && (
+        <div
+          {...listeners}
+          {...attributes}
+          role="button"
+          aria-label={`Arrastar peça ${piece.reference}`}
+          tabIndex={0}
+          className="absolute left-0 top-0 bottom-0 w-9 md:w-6 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-l-xl hover:bg-zinc-50 active:bg-zinc-100 transition-colors z-[1]"
+          title="Arrastar"
+        >
+          <svg
+            className="w-3.5 h-4 text-zinc-400 group-hover:text-zinc-600"
+            viewBox="0 0 8 16"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            {/* 2-col x 4-row dot grid — universal "drag me" affordance. */}
+            <circle cx="2" cy="2" r="1.2" />
+            <circle cx="6" cy="2" r="1.2" />
+            <circle cx="2" cy="6" r="1.2" />
+            <circle cx="6" cy="6" r="1.2" />
+            <circle cx="2" cy="10" r="1.2" />
+            <circle cx="6" cy="10" r="1.2" />
+            <circle cx="2" cy="14" r="1.2" />
+            <circle cx="6" cy="14" r="1.2" />
+          </svg>
+        </div>
+      )}
+
+      {/* Left border colored by project — sits on top of the handle area.
+          Pointer-events:none so it doesn't intercept taps on the handle. */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl"
+        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl pointer-events-none"
         style={{ backgroundColor: projectColor }}
       />
 
@@ -238,7 +270,7 @@ export function PieceCard({
         </div>
       )}
 
-      <div className="pl-4 pr-3 py-3">
+      <div className="pl-11 md:pl-8 pr-3 py-3">
         {/* Row 1: Reference + urgency + program status */}
         <div className="flex items-center justify-between gap-2">
           <span className="text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>

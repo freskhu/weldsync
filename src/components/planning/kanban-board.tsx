@@ -120,7 +120,10 @@ export function KanbanBoard({
     activationConstraint: { distance: 8 },
   });
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 200, tolerance: 8 },
+    // 250ms long-press before drag starts. Lower values trigger drag when
+    // users intend a tap/scroll on iPad. Tolerance allows ~8px finger drift
+    // during the long-press without cancelling.
+    activationConstraint: { delay: 250, tolerance: 8 },
   });
   const keyboardSensor = useSensor(KeyboardSensor);
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
