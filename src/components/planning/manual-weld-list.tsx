@@ -1,4 +1,5 @@
-import type { Piece } from "@/lib/types";
+import type { Piece, Robot } from "@/lib/types";
+import { ManualWeldRowActions } from "@/components/planning/manual-weld-row-actions";
 
 /**
  * Manual-weld list view (Step 5).
@@ -8,18 +9,23 @@ import type { Piece } from "@/lib/types";
  * (i.e. not by a robot) — useful for invoicing, capacity reviews, and to
  * justify why a piece never went through the kanban.
  *
- * No drag-and-drop here: a manual_weld piece is terminal; the only way out
- * is via the audit/edit screen, which lives elsewhere. Keeping this view
- * dumb and read-only is intentional.
+ * Each row exposes two revert paths via the inline ManualWeldRowActions
+ * client component:
+ *   - "→ Planeados": send the piece back to the planning column.
+ *   - "→ Programada": pick a robot and send back to programmed.
  *
- * Server Component on purpose — needs zero interactivity. Receives `pieces`
- * already loaded by the page; we just filter, group, and render.
+ * Server Component on purpose — needs zero interactivity at this level.
+ * Interactivity is pushed to the smallest leaf (row actions). Receives
+ * `pieces` and `robots` already loaded by the page; we just filter, group,
+ * and render.
  */
 
 interface ManualWeldListProps {
   /** Full piece list from the page. We filter inside. */
   pieces: Piece[];
   projectMap: Record<string, { name: string; color: string }>;
+  /** Robot catalog needed by the per-row "→ Programada" picker. */
+  robots: Robot[];
 }
 
 interface ProjectGroup {
@@ -51,7 +57,11 @@ function formatWeight(kg: number | null): string {
   })} kg`;
 }
 
-export function ManualWeldList({ pieces, projectMap }: ManualWeldListProps) {
+export function ManualWeldList({
+  pieces,
+  projectMap,
+  robots,
+}: ManualWeldListProps) {
   // Filter first, then group. Sorted within each group by most recent status
   // change (descending) so the latest manual welds bubble to the top.
   const manual = pieces.filter((p) => p.status === "manual_weld");
@@ -126,20 +136,23 @@ export function ManualWeldList({ pieces, projectMap }: ManualWeldListProps) {
             {g.pieces.map((piece) => (
               <li
                 key={piece.id}
-                className="px-4 py-3 flex items-center gap-4 text-[13px]"
+                className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-4 text-[13px]"
               >
-                <span className="font-mono font-bold text-zinc-900 min-w-[120px] truncate">
-                  {piece.reference}
-                </span>
-                <span className="flex-1 text-zinc-600 truncate">
-                  {piece.description ?? "—"}
-                </span>
-                <span className="text-zinc-700 tabular-nums whitespace-nowrap">
-                  {formatWeight(piece.weight_kg)}
-                </span>
-                <span className="text-zinc-500 tabular-nums whitespace-nowrap min-w-[140px] text-right">
-                  {formatDateTime(piece.last_status_change_at)}
-                </span>
+                <div className="flex flex-1 flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
+                  <span className="font-mono font-bold text-zinc-900 min-w-[120px] truncate">
+                    {piece.reference}
+                  </span>
+                  <span className="flex-1 text-zinc-600 truncate min-w-0">
+                    {piece.description ?? "—"}
+                  </span>
+                  <span className="text-zinc-700 tabular-nums whitespace-nowrap">
+                    {formatWeight(piece.weight_kg)}
+                  </span>
+                  <span className="text-zinc-500 tabular-nums whitespace-nowrap md:min-w-[140px] md:text-right">
+                    {formatDateTime(piece.last_status_change_at)}
+                  </span>
+                </div>
+                <ManualWeldRowActions piece={piece} robots={robots} />
               </li>
             ))}
           </ul>
