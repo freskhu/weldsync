@@ -7,8 +7,26 @@ import { getRobots } from "@/lib/data/programs";
 import { getActivePlanningWindow } from "@/lib/data/planning-window";
 import { KanbanBoard } from "@/components/planning/kanban-board";
 import { PlanningWindowBar } from "@/components/planning/planning-window-bar";
+import {
+  PlanningTabs,
+  type PlanningView,
+} from "@/components/planning/planning-tabs";
 
-export default async function PlanningPage() {
+interface PlanningPageProps {
+  // App Router serializes searchParams to this shape. Optional because the
+  // default view is the Kanban (no query string).
+  searchParams?: { view?: string };
+}
+
+function resolveView(raw: string | undefined): PlanningView {
+  return raw === "manual" ? "manual" : "kanban";
+}
+
+export default async function PlanningPage({
+  searchParams,
+}: PlanningPageProps) {
+  const activeView = resolveView(searchParams?.view);
+
   let pieces, projects, robots, planningWindow;
   try {
     pieces = await getAllPieces();
@@ -74,19 +92,39 @@ export default async function PlanningPage() {
     // fail-soft — empty map -> footer hides
   }
 
+  // Pre-compute tab badges on the server so the client tab strip stays
+  // dumb (no data fetching). `manual` count = pieces with status manual_weld.
+  const manualWeldCount = pieces.filter(
+    (p) => p.status === "manual_weld"
+  ).length;
+
   return (
     <div className="p-4 md:p-6 h-[100dvh] flex flex-col">
       <h1 className="text-2xl font-bold text-zinc-900 mb-4">Programação</h1>
-      <div className="mb-4 flex-shrink-0">
-        <PlanningWindowBar window={planningWindow} />
-      </div>
-      <KanbanBoard
-        initialPieces={pieces}
-        projectMap={projectMap}
-        robotMap={robotMap}
-        robots={robots}
-        userMap={userMap}
+      <PlanningTabs
+        active={activeView}
+        badges={{ manual: manualWeldCount > 0 ? manualWeldCount : undefined }}
       />
+      {activeView === "kanban" ? (
+        <>
+          <div className="mb-4 flex-shrink-0">
+            <PlanningWindowBar window={planningWindow} />
+          </div>
+          <KanbanBoard
+            initialPieces={pieces}
+            projectMap={projectMap}
+            robotMap={robotMap}
+            robots={robots}
+            userMap={userMap}
+          />
+        </>
+      ) : (
+        // Manual-weld list lands in step 5. Placeholder keeps the tab
+        // navigable today so the URL contract is testable.
+        <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+          (Lista de soldado à mão — em construção)
+        </div>
+      )}
     </div>
   );
 }
