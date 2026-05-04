@@ -125,14 +125,14 @@ function UnplannedCard({
       <div className="relative flex items-center justify-between gap-2 pointer-events-none">
         <div className="flex items-baseline gap-1.5 min-w-0">
           <span
-            className="text-[11.5px] font-bold font-mono truncate"
+            className="text-[14px] md:text-[11.5px] font-bold font-mono truncate"
             style={{ color: ink }}
           >
             {piece.reference}
           </span>
           {clientRef && (
             <span
-              className="text-[10px] font-mono truncate"
+              className="text-[12px] md:text-[10px] font-mono truncate"
               style={{ color: inkMuted }}
             >
               {clientRef}
@@ -159,7 +159,7 @@ function UnplannedCard({
       </div>
       {piece.description && (
         <p
-          className="relative text-[11px] truncate mt-0.5 pointer-events-none"
+          className="relative text-[13px] md:text-[11px] truncate mt-0.5 pointer-events-none"
           style={{ color: inkMuted }}
         >
           {piece.description}
@@ -167,7 +167,7 @@ function UnplannedCard({
       )}
       {metric && (
         <p
-          className="relative text-[10px] mt-0.5 pointer-events-none"
+          className="relative text-[12px] md:text-[10px] mt-0.5 pointer-events-none"
           style={{ color: inkMuted }}
         >
           {metric}
@@ -176,7 +176,7 @@ function UnplannedCard({
       {robotName && (
         <div className="relative mt-1 pointer-events-none">
           <span
-            className="inline-flex items-center text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-black/15 max-w-full truncate"
+            className="inline-flex items-center text-[12px] md:text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-black/15 max-w-full truncate"
             style={{ color: ink }}
             title={`Robot: ${robotName}`}
           >
@@ -323,15 +323,15 @@ export function UnplannedSidebar({
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: color }}
                 />
-                <h3 className="text-[11px] font-semibold text-zinc-700 truncate">
+                <h3 className="text-[13px] md:text-[11px] font-semibold text-zinc-700 truncate">
                   {name}
                 </h3>
                 {clientRef && (
-                  <span className="text-[10px] font-mono text-zinc-500 truncate">
+                  <span className="text-[12px] md:text-[10px] font-mono text-zinc-500 truncate">
                     {clientRef}
                   </span>
                 )}
-                <span className="text-[10px] text-zinc-400 ml-auto">
+                <span className="text-[12px] md:text-[10px] text-zinc-400 ml-auto">
                   {projectPieces.length}
                 </span>
               </header>
@@ -363,7 +363,7 @@ export function UnplannedSidebar({
         <h2 className="text-xs font-semibold text-zinc-700 uppercase tracking-wider">
           Por planear
         </h2>
-        <p className="text-[11px] text-zinc-500 mt-0.5">
+        <p className="text-[13px] md:text-[11px] text-zinc-500 mt-0.5">
           {unplanned.length}{" "}
           {unplanned.length === 1 ? "peça" : "peças"} — arrasta para a grelha
         </p>

@@ -282,7 +282,7 @@ export function PieceCard({
       <div className="pl-11 md:pl-8 pr-3 py-3">
         {/* Row 1: Reference + urgency + program status */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
+          <span className="text-[14px] md:text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
             {piece.reference}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -309,17 +309,17 @@ export function PieceCard({
 
         {/* Row 2: Piece description (what we're welding) */}
         {piece.description && (
-          <p className="text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
+          <p className="text-[13px] md:text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
             {piece.description}
           </p>
         )}
 
         {/* Row 3: Project name */}
-        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
+        <p className="text-[13px] md:text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
 
         {/* Row 4: Material + Weight */}
         {(piece.material || piece.weight_kg != null) && (
-          <div className="flex items-center gap-2 mt-1.5 text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
+          <div className="flex items-center gap-2 mt-1.5 text-[12px] md:text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
             {piece.material && (
               <span className="truncate">{piece.material}</span>
             )}
@@ -333,12 +333,12 @@ export function PieceCard({
         {/* Row 5: Metadata pills */}
         <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'var(--color-line-soft)' }}>
           {robotName && (
-            <span className="inline-flex items-center text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
+            <span className="inline-flex items-center text-[12px] md:text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
               {robotName}
             </span>
           )}
           {deadlineInfo && (
-            <span className={`inline-flex items-center text-[10px] font-medium ${deadlineInfo.color} bg-zinc-50 rounded-full px-2 py-0.5`}>
+            <span className={`inline-flex items-center text-[12px] md:text-[10px] font-medium ${deadlineInfo.color} bg-zinc-50 rounded-full px-2 py-0.5`}>
               {deadlineInfo.label}
             </span>
           )}
