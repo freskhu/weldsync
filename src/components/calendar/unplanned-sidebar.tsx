@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useDndMonitor, useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
 import { textOn, mutedTextOn } from "@/lib/color-utils";
-import { deletePieceAction } from "@/app/actions/piece-actions";
+import { Trash2 } from "lucide-react";
+import {
+  deletePieceAction,
+  markPieceAsManualWeldAction,
+} from "@/app/actions/piece-actions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ---------------------------------------------------------------------------
@@ -87,6 +91,12 @@ function UnplannedCard({
     // Accessible confirm dialog. Action runs inside onConfirm so the dialog
     // owns the loading + inline error state. The wrapping useTransition keeps
     // the card's delete-button spinner alive while the server action runs.
+    //
+    // Manual-weld escape hatch — same gate as PieceCard: only offered when
+    // a planner has already committed the piece (planned/programmed).
+    const offerManualWeld =
+      piece.status === "planned" || piece.status === "programmed";
+
     startDeleteTransition(async () => {
       await confirm({
         title: "Eliminar peça",
@@ -104,6 +114,19 @@ function UnplannedCard({
           }
           router.refresh();
         },
+        alternate: offerManualWeld
+          ? {
+              label: "Soldar à mão",
+              tone: "default",
+              onAction: async () => {
+                const result = await markPieceAsManualWeldAction(piece.id);
+                if (!result.success) {
+                  throw new Error(result.error ?? "Erro desconhecido.");
+                }
+                router.refresh();
+              },
+            }
+          : undefined,
       });
     });
   }
@@ -213,19 +236,7 @@ function UnplannedCard({
             />
           </svg>
         ) : (
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
+          <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />
         )}
       </button>
     </div>

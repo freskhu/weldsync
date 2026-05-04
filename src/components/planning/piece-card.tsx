@@ -2,8 +2,12 @@
 
 import { useTransition } from "react";
 import { useDraggable } from "@dnd-kit/core";
+import { Trash2, Loader2 } from "lucide-react";
 import type { Piece } from "@/lib/types";
-import { deletePieceAction } from "@/app/actions/piece-actions";
+import {
+  deletePieceAction,
+  markPieceAsManualWeldAction,
+} from "@/app/actions/piece-actions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface PieceCardProps {
@@ -83,6 +87,15 @@ export function PieceCard({
     // so the dialog handles its own loading + inline error state. The outer
     // useTransition still wraps the call to keep the card's toolbar spinner
     // visible while the server action is in flight.
+    //
+    // Manual-weld escape hatch: when the piece is already planned or
+    // programmed, the shop floor sometimes decides to weld by hand. Show a
+    // 3rd button so the planner doesn't have to delete-then-recreate the
+    // piece (which would lose history). The server action validates the
+    // status transition; we only gate the UI affordance here.
+    const offerManualWeld =
+      piece.status === "planned" || piece.status === "programmed";
+
     startDeleteTransition(async () => {
       await confirm({
         title: "Eliminar peça",
@@ -101,6 +114,22 @@ export function PieceCard({
           }
           onDeleted?.(piece.id);
         },
+        alternate: offerManualWeld
+          ? {
+              label: "Soldar à mão",
+              tone: "default",
+              onAction: async () => {
+                const result = await markPieceAsManualWeldAction(piece.id);
+                if (!result.success) {
+                  throw new Error(result.error ?? "Erro desconhecido.");
+                }
+                // Treat as a "removal" from the current view: the piece is
+                // no longer planned/programmed and parent kanban filters by
+                // those statuses. Keeps optimistic UI consistent.
+                onDeleted?.(piece.id);
+              },
+            }
+          : undefined,
       });
     });
   }
@@ -266,14 +295,9 @@ export function PieceCard({
             aria-label={`Eliminar peça ${piece.reference}`}
           >
             {isDeleting ? (
-              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />
             )}
           </button>
         </div>

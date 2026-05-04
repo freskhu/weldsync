@@ -254,6 +254,7 @@ const VALID_STATUSES: PieceStatus[] = [
   "backlog",
   "planned",
   "programmed",
+  "manual_weld",
   "allocated",
   "in_production",
   "completed",
@@ -623,6 +624,75 @@ export async function programPieceWithRobotAction(
   const patch: Parameters<typeof dbUpdatePiece>[1] = {
     status: "programmed",
     robot_id: robotId,
+    priority: null,
+    ...statusAuditPatch(userId),
+  };
+
+  let piece;
+  try {
+    piece = await dbUpdatePiece(pieceId, patch);
+  } catch (err) {
+    if (err instanceof PieceOverlapError) {
+      return { success: false, error: PIECE_OVERLAP_MESSAGE };
+    }
+    throw err;
+  }
+  if (!piece) return { success: false, error: "Peca nao encontrada." };
+
+  await logAudit(supabase, "UPDATE", "piece", pieceId, before, piece);
+
+  revalidatePath("/planning");
+  revalidatePath("/calendar");
+  revalidatePath("/robots");
+  return { success: true };
+}
+
+/**
+ * Marks a piece as welded by hand on the shop floor (status='manual_weld').
+ * The piece exits the automated planning flow but stays in the database for
+ * historical tracking (weight, project attribution, audit trail).
+ *
+ * Only valid from "planned" or "programmed" — the two states where a planner
+ * has already committed the piece but the shop decides to bypass the robot.
+ * From any other state we reject so the UI never offers the option in the
+ * wrong context.
+ *
+ * Side effects on transition:
+ *   - clears robot_id (no robot is involved anymore)
+ *   - clears scheduled_date / scheduled_period (off the calendar)
+ *   - clears planned_start_date / planned_end_date / *_period (off the Gantt)
+ *   - clears priority (was either already null on programmed, or gets cleared
+ *     because the piece is leaving the planned column)
+ *   - stamps audit fields
+ */
+export async function markPieceAsManualWeldAction(
+  pieceId: string
+): Promise<ActionResult> {
+  if (!pieceId) return { success: false, error: "ID da peca em falta." };
+
+  const before = await getPieceById(pieceId);
+  if (!before) return { success: false, error: "Peca nao encontrada." };
+
+  if (before.status !== "planned" && before.status !== "programmed") {
+    return {
+      success: false,
+      error:
+        "Só é possível marcar como soldado à mão peças em Planeado ou Programada.",
+    };
+  }
+
+  const supabase = await createClient();
+  const userId = await getCurrentUserId(supabase);
+
+  const patch: Parameters<typeof dbUpdatePiece>[1] = {
+    status: "manual_weld",
+    robot_id: null,
+    scheduled_date: null,
+    scheduled_period: null,
+    planned_start_date: null,
+    planned_end_date: null,
+    planned_start_period: null,
+    planned_end_period: null,
     priority: null,
     ...statusAuditPatch(userId),
   };

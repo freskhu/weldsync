@@ -25,6 +25,7 @@ const pieceBaseObject = z.object({
       "backlog",
       "planned",
       "programmed",
+      "manual_weld",
       "allocated",
       "in_production",
       "completed",

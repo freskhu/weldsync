@@ -13,6 +13,7 @@ const VALID: PieceStatus[] = [
   "backlog",
   "planned",
   "programmed",
+  "manual_weld",
   "allocated",
   "in_production",
   "completed",
