@@ -71,6 +71,7 @@ import { PieceCard } from "./piece-card";
 import { KanbanFilters } from "./kanban-filters";
 import { AllocationModal } from "./allocation-modal";
 import { RobotPickerModal } from "./robot-picker-modal";
+import { MobilePieceList } from "./mobile-piece-list";
 
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
@@ -488,7 +489,10 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 flex gap-5 overflow-x-auto pb-4 min-h-0 scroll-smooth px-1">
+        {/* Desktop: 4-column kanban with horizontal scroll. lg breakpoint
+            (1024px) is the cutoff — anything narrower (phone, portrait
+            iPad) gets the vertical mobile list below. */}
+        <div className="hidden lg:flex flex-1 gap-5 overflow-x-auto pb-4 min-h-0 scroll-smooth px-1">
           {COLUMNS.map((col) => (
             <KanbanColumn
               key={col.id}
@@ -534,6 +538,22 @@ export function KanbanBoard({
               })}
             </KanbanColumn>
           ))}
+        </div>
+
+        {/* Mobile / portrait tablet: vertical list of collapsible status
+            sections. Shares activeId/overId state with desktop so the
+            DragOverlay below renders in both layouts. */}
+        <div className="flex lg:hidden flex-1 flex-col min-h-0">
+          <MobilePieceList
+            columnPieces={columnPieces}
+            projectMap={projectMap}
+            robotMap={robotMap}
+            userMap={userMap}
+            activeId={activeId}
+            overId={overId}
+            onDeletePiece={handleDeletePiece}
+            onReorder={handleReorder}
+          />
         </div>
 
         <DragOverlay dropAnimation={null}>

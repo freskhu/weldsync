@@ -129,7 +129,7 @@ function MobileSection({
 }
 
 interface MobilePieceListProps {
-  pieces: Piece[];
+  /** Pieces grouped by status — same map computed by kanban-board. */
   columnPieces: Record<PieceStatus, Piece[]>;
   projectMap: Record<string, { name: string; color: string }>;
   robotMap: Record<number, string>;
