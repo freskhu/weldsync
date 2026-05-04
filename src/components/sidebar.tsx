@@ -127,7 +127,7 @@ export function Sidebar({ user }: { user?: SidebarUser }) {
 
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth >= 1024) setOpen(false);
+      if (window.innerWidth >= 768) setOpen(false);
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -144,7 +144,7 @@ export function Sidebar({ user }: { user?: SidebarUser }) {
   return (
     <>
       {/* Mobile/tablet top bar */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-40" style={{ backgroundColor: 'var(--color-surface-sidebar)' }}>
+      <div className="md:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-40" style={{ backgroundColor: 'var(--color-surface-sidebar)' }}>
         <LogoMark />
         <button
           type="button"
@@ -167,14 +167,14 @@ export function Sidebar({ user }: { user?: SidebarUser }) {
       {/* Mobile/tablet overlay */}
       {open && (
         <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          className="md:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
       )}
 
       {/* Mobile/tablet slide-out menu */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-40 w-[280px] h-full transform transition-transform duration-200 ease-out ${
+        className={`md:hidden fixed top-0 left-0 z-40 w-[280px] h-full transform transition-transform duration-200 ease-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ backgroundColor: 'var(--color-surface-sidebar)' }}
@@ -224,7 +224,7 @@ export function Sidebar({ user }: { user?: SidebarUser }) {
 
       {/* Desktop sidebar */}
       <aside
-        className="hidden lg:flex w-[260px] min-h-[100dvh] flex-col flex-shrink-0"
+        className="hidden md:flex w-[260px] min-h-[100dvh] flex-col flex-shrink-0"
         style={{ backgroundColor: 'var(--color-surface-sidebar)' }}
       >
         <div className="p-5 border-b border-white/10">
