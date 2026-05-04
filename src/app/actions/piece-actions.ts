@@ -20,7 +20,7 @@ import {
   getPlannedNeighbour,
   swapPlannedPriorities,
 } from "@/lib/data/store";
-import type { Piece, PieceStatus } from "@/lib/types";
+import type { PieceStatus } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit, getCurrentUserId } from "@/lib/audit";
 
@@ -834,5 +834,8 @@ export async function clearPlannedRangeAction(
   return { success: true };
 }
 
-// Re-export Piece type for callers that import alongside actions.
-export type { Piece };
+// NOTE: Do NOT re-export types from a "use server" module. Next 16 + Turbopack
+// rejects non-async exports here, and even `export type { ... }` can leak into
+// the SSR bundle as a runtime reference, causing
+// `ReferenceError: Piece is not defined`. Callers should import `Piece`
+// directly from "@/lib/types".
