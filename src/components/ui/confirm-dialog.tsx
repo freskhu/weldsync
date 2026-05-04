@@ -31,6 +31,23 @@ import {
 
 type ConfirmTone = "destructive" | "default";
 
+/**
+ * Optional 3rd action ("alternate") shown alongside Confirm + Cancel.
+ *
+ * Use case: a destructive flow where the user might want a non-destructive
+ * alternative (e.g. delete a piece OR mark it as welded by hand). The
+ * alternate action runs its own async handler; if it succeeds the dialog
+ * closes and `confirm()` resolves to false (since the primary destructive
+ * action did NOT happen). The caller can detect alternate-path completion
+ * via a side effect inside `onAction` (e.g. router.refresh, optimistic UI).
+ */
+export interface ConfirmAlternateAction {
+  label: string;
+  onAction: () => Promise<void> | void;
+  /** Tone of the alternate button. Default: "default" (neutral). */
+  tone?: ConfirmTone;
+}
+
 export interface ConfirmOptions {
   title: string;
   description?: string;
@@ -50,6 +67,12 @@ export interface ConfirmOptions {
    * caller is responsible for the side effect.
    */
   onConfirm?: () => Promise<void> | void;
+  /**
+   * Optional 3rd action — rendered between Cancel and Confirm. Gives the
+   * user a non-destructive alternative without forcing them through a
+   * separate menu. Same error-handling contract as `onConfirm`.
+   */
+  alternate?: ConfirmAlternateAction;
 }
 
 interface DialogState extends ConfirmOptions {
@@ -115,6 +138,22 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
       }
     } else {
       close(true);
+    }
+  }, [state, close]);
+
+  const handleAlternate = useCallback(async () => {
+    if (!state || !state.alternate) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await state.alternate.onAction();
+      // Resolve to false: the primary (destructive) action did NOT run.
+      // Callers wanting alternate-path success state should rely on side
+      // effects inside onAction (router.refresh, optimistic UI, etc).
+      close(false);
+    } catch (err) {
+      setBusy(false);
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     }
   }, [state, close]);
 
@@ -207,6 +246,21 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
               >
                 {state.cancelLabel ?? "Cancelar"}
               </button>
+              {state.alternate && (
+                <button
+                  type="button"
+                  onClick={handleAlternate}
+                  disabled={busy}
+                  className={
+                    "inline-flex items-center justify-center min-h-[44px] px-4 rounded-lg text-[14px] font-semibold shadow-sm disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation gap-2 " +
+                    ((state.alternate.tone ?? "default") === "destructive"
+                      ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
+                      : "bg-zinc-900 text-white hover:bg-zinc-800 active:bg-zinc-950")
+                  }
+                >
+                  <span>{state.alternate.label}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleConfirm}

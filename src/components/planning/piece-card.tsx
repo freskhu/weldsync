@@ -3,7 +3,10 @@
 import { useTransition } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
-import { deletePieceAction } from "@/app/actions/piece-actions";
+import {
+  deletePieceAction,
+  markPieceAsManualWeldAction,
+} from "@/app/actions/piece-actions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface PieceCardProps {
@@ -83,6 +86,15 @@ export function PieceCard({
     // so the dialog handles its own loading + inline error state. The outer
     // useTransition still wraps the call to keep the card's toolbar spinner
     // visible while the server action is in flight.
+    //
+    // Manual-weld escape hatch: when the piece is already planned or
+    // programmed, the shop floor sometimes decides to weld by hand. Show a
+    // 3rd button so the planner doesn't have to delete-then-recreate the
+    // piece (which would lose history). The server action validates the
+    // status transition; we only gate the UI affordance here.
+    const offerManualWeld =
+      piece.status === "planned" || piece.status === "programmed";
+
     startDeleteTransition(async () => {
       await confirm({
         title: "Eliminar peça",
@@ -101,6 +113,22 @@ export function PieceCard({
           }
           onDeleted?.(piece.id);
         },
+        alternate: offerManualWeld
+          ? {
+              label: "Soldar à mão",
+              tone: "default",
+              onAction: async () => {
+                const result = await markPieceAsManualWeldAction(piece.id);
+                if (!result.success) {
+                  throw new Error(result.error ?? "Erro desconhecido.");
+                }
+                // Treat as a "removal" from the current view: the piece is
+                // no longer planned/programmed and parent kanban filters by
+                // those statuses. Keeps optimistic UI consistent.
+                onDeleted?.(piece.id);
+              },
+            }
+          : undefined,
       });
     });
   }

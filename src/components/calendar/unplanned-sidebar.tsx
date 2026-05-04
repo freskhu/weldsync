@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useDndMonitor, useDraggable } from "@dnd-kit/core";
 import type { Piece } from "@/lib/types";
 import { textOn, mutedTextOn } from "@/lib/color-utils";
-import { deletePieceAction } from "@/app/actions/piece-actions";
+import {
+  deletePieceAction,
+  markPieceAsManualWeldAction,
+} from "@/app/actions/piece-actions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ---------------------------------------------------------------------------
@@ -87,6 +90,12 @@ function UnplannedCard({
     // Accessible confirm dialog. Action runs inside onConfirm so the dialog
     // owns the loading + inline error state. The wrapping useTransition keeps
     // the card's delete-button spinner alive while the server action runs.
+    //
+    // Manual-weld escape hatch — same gate as PieceCard: only offered when
+    // a planner has already committed the piece (planned/programmed).
+    const offerManualWeld =
+      piece.status === "planned" || piece.status === "programmed";
+
     startDeleteTransition(async () => {
       await confirm({
         title: "Eliminar peça",
@@ -104,6 +113,19 @@ function UnplannedCard({
           }
           router.refresh();
         },
+        alternate: offerManualWeld
+          ? {
+              label: "Soldar à mão",
+              tone: "default",
+              onAction: async () => {
+                const result = await markPieceAsManualWeldAction(piece.id);
+                if (!result.success) {
+                  throw new Error(result.error ?? "Erro desconhecido.");
+                }
+                router.refresh();
+              },
+            }
+          : undefined,
       });
     });
   }
