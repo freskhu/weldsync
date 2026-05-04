@@ -11,6 +11,7 @@ import {
   PlanningTabs,
   type PlanningView,
 } from "@/components/planning/planning-tabs";
+import { ManualWeldList } from "@/components/planning/manual-weld-list";
 
 interface PlanningPageProps {
   // App Router serializes searchParams to this shape. Optional because the
@@ -119,11 +120,7 @@ export default async function PlanningPage({
           />
         </>
       ) : (
-        // Manual-weld list lands in step 5. Placeholder keeps the tab
-        // navigable today so the URL contract is testable.
-        <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
-          (Lista de soldado à mão — em construção)
-        </div>
+        <ManualWeldList pieces={pieces} projectMap={projectMap} />
       )}
     </div>
   );
