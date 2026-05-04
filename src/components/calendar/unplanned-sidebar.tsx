@@ -183,7 +183,7 @@ function UnplannedCard({
         type="button"
         onClick={handleDelete}
         disabled={isDeleting}
-        className="absolute top-0.5 right-0.5 w-8 h-8 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-black/20 disabled:opacity-50 transition-opacity"
+        className="absolute top-0.5 right-0.5 w-11 h-11 md:w-8 md:h-8 flex items-center justify-center rounded-md opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-black/20 disabled:opacity-50 transition-opacity"
         style={{ color: ink }}
         title="Eliminar peça definitivamente"
         aria-label={`Eliminar peça ${piece.reference}`}

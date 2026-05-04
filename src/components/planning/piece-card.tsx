@@ -192,7 +192,7 @@ export function PieceCard({
                 onClick={(e) => handleReorderClick(e, "up")}
                 onPointerDown={handleReorderPointerDown}
                 disabled={!canMoveUp}
-                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
                 title="Subir prioridade"
                 aria-label={`Subir prioridade da peça ${piece.reference}`}
               >
@@ -205,7 +205,7 @@ export function PieceCard({
                 onClick={(e) => handleReorderClick(e, "down")}
                 onPointerDown={handleReorderPointerDown}
                 disabled={!canMoveDown}
-                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
                 title="Descer prioridade"
                 aria-label={`Descer prioridade da peça ${piece.reference}`}
               >
@@ -220,7 +220,7 @@ export function PieceCard({
             onClick={handleDelete}
             onPointerDown={handleDeletePointerDown}
             disabled={isDeleting}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 opacity-40 group-hover:opacity-100 focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
+            className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md text-zinc-400 md:opacity-40 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
             title="Eliminar peça definitivamente"
             aria-label={`Eliminar peça ${piece.reference}`}
           >
