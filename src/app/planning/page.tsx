@@ -107,18 +107,18 @@ export default async function PlanningPage({
         badges={{ manual: manualWeldCount > 0 ? manualWeldCount : undefined }}
       />
       {activeView === "kanban" ? (
-        <>
-          <div className="mb-4 flex-shrink-0">
-            <PlanningWindowBar window={planningWindow} />
-          </div>
-          <KanbanBoard
-            initialPieces={pieces}
-            projectMap={projectMap}
-            robotMap={robotMap}
-            robots={robots}
-            userMap={userMap}
-          />
-        </>
+        // KanbanBoard now owns the responsive layout for the toolbar:
+        // - md+: renders the window bar inline above the filter strip
+        // - <md: tucks both behind a "Filtros" drawer toggle so the
+        //   4-column kanban gets all the vertical space.
+        <KanbanBoard
+          initialPieces={pieces}
+          projectMap={projectMap}
+          robotMap={robotMap}
+          robots={robots}
+          userMap={userMap}
+          windowBar={<PlanningWindowBar window={planningWindow} />}
+        />
       ) : (
         <ManualWeldList
           pieces={pieces}
