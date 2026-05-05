@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Trash2 } from "lucide-react";
 import type { Piece } from "@/lib/types";
@@ -8,6 +9,7 @@ import {
   markPieceAsManualWeldAction,
 } from "@/app/actions/piece-actions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { PieceDetailSheet } from "./piece-detail-sheet";
 
 interface PieceCardProps {
   piece: Piece;
@@ -69,6 +71,25 @@ export function PieceCard({
     id: piece.id,
   });
   const confirm = useConfirm();
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // Tap on the card body opens the detail sheet. Mobile-first behaviour:
+  // the compact mobile card only shows reference + colour rail, so the
+  // operator needs a way to see material/weight/project/etc. The sheet is
+  // also useful on desktop as a quick read-only summary, so we don't gate
+  // it behind a media query — the trigger is a click anywhere in the body
+  // that isn't the drag handle or an action button.
+  function handleBodyClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (isOverlay) return;
+    // Bail if the click bubbled from an interactive child (button, the
+    // drag handle, etc.). Those have their own handlers and stopPropagation,
+    // but defensive check in case future code forgets.
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("[data-no-dnd]") || target.closest('[role="button"]')) {
+      return;
+    }
+    setDetailOpen(true);
+  }
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
@@ -207,7 +228,7 @@ export function PieceCard({
           role="button"
           aria-label={`Arrastar peça ${piece.reference}`}
           tabIndex={0}
-          className="absolute left-0 top-0 bottom-0 w-9 md:w-6 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-l-xl hover:bg-zinc-50 active:bg-zinc-100 transition-colors z-[1]"
+          className="absolute left-0 top-0 bottom-0 w-7 md:w-6 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-l-xl hover:bg-zinc-50 active:bg-zinc-100 transition-colors z-[1]"
           title="Arrastar"
         >
           <svg
@@ -252,8 +273,14 @@ export function PieceCard({
           // wants to skip elements explicitly. Harmless on its own.
           data-no-dnd="true"
         >
+          {/* Reorder arrows are hidden on mobile (<md) to keep the compact
+              card tidy. On a 4-up phone layout there isn't room to fit
+              ▲▼ + delete + drag handle on one row. The arrows reappear on
+              md+ where the column has room for the full toolbar. Drag-and-
+              drop within the column still works on mobile via the drag
+              handle on the left rail. */}
           {showReorderArrows && (
-            <>
+            <div className="hidden md:flex items-center gap-1">
               <button
                 type="button"
                 onClick={(e) => handleReorderClick(e, "up")}
@@ -280,36 +307,45 @@ export function PieceCard({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-            </>
+            </div>
           )}
           <button
             type="button"
             onClick={handleDelete}
             onPointerDown={handleDeletePointerDown}
-            className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md text-zinc-400 md:opacity-40 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
+            className="w-7 h-7 md:w-7 md:h-7 flex items-center justify-center rounded-md text-zinc-400 md:opacity-40 md:group-hover:opacity-100 md:focus:opacity-100 hover:bg-zinc-100 hover:text-[var(--color-danger)] disabled:opacity-50 transition-opacity"
             title="Eliminar peça definitivamente"
             aria-label={`Eliminar peça ${piece.reference}`}
           >
-            <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />
+            <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" strokeWidth={2.5} />
           </button>
         </div>
       )}
 
-      <div className="pl-11 md:pl-8 pr-3 py-3">
-        {/* Row 1: Reference + urgency + program status */}
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[14px] md:text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
+      {/* Body. Tap on mobile (or click on desktop) opens a full-screen
+          detail sheet so the operator can see everything we hide on the
+          compact card (description, material, weight, robot, planned
+          dates, audit, etc.). The drag handle and action buttons stop
+          propagation so they keep working as before. */}
+      <div
+        className="pl-10 md:pl-8 pr-1.5 md:pr-3 py-1.5 md:py-3 cursor-pointer"
+        onClick={isOverlay ? undefined : handleBodyClick}
+      >
+        {/* Row 1: Reference + urgency + program status. Always visible —
+            this is the only field that survives on the mobile compact card. */}
+        <div className="flex items-center justify-between gap-1 md:gap-2">
+          <span className="text-[11px] md:text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
             {piece.reference}
           </span>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
             {piece.urgent && (
-              <svg className="w-4 h-4 text-[var(--color-danger)] shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-label="Urgente">
+              <svg className="w-3 h-3 md:w-4 md:h-4 text-[var(--color-danger)] shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-label="Urgente">
                 <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
             )}
             {piece.program_id && (
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--color-success-bg)] text-[var(--color-success-text)]" title="Programa atribuido">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <span className="inline-flex items-center justify-center w-4 h-4 md:w-5 md:h-5 rounded-full bg-[var(--color-success-bg)] text-[var(--color-success-text)]" title="Programa atribuido">
+                <svg className="w-2.5 h-2.5 md:w-3 md:h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </span>
@@ -317,66 +353,86 @@ export function PieceCard({
           </div>
         </div>
 
-        {/* Row 2: Piece description (what we're welding) */}
-        {piece.description && (
-          <p className="text-[13px] md:text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
-            {piece.description}
-          </p>
-        )}
+        {/* Everything below this point is hidden on mobile (<md). Tapping
+            the card opens the detail sheet for the full info. */}
+        <div className="hidden md:block">
+          {/* Row 2: Piece description (what we're welding) */}
+          {piece.description && (
+            <p className="text-[13px] md:text-[12px] font-medium truncate mt-1" style={{ color: 'var(--color-ink)' }}>
+              {piece.description}
+            </p>
+          )}
 
-        {/* Row 3: Project name */}
-        <p className="text-[13px] md:text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
+          {/* Row 3: Project name */}
+          <p className="text-[13px] md:text-[11px] truncate mt-0.5" style={{ color: 'var(--color-ink-soft)' }}>{projectName}</p>
 
-        {/* Row 4: Material + Weight */}
-        {(piece.material || piece.weight_kg != null) && (
-          <div className="flex items-center gap-2 mt-1.5 text-[12px] md:text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
-            {piece.material && (
-              <span className="truncate">{piece.material}</span>
+          {/* Row 4: Material + Weight */}
+          {(piece.material || piece.weight_kg != null) && (
+            <div className="flex items-center gap-2 mt-1.5 text-[12px] md:text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
+              {piece.material && (
+                <span className="truncate">{piece.material}</span>
+              )}
+              {piece.material && piece.weight_kg != null && <span>·</span>}
+              {piece.weight_kg != null && (
+                <span className="shrink-0">{piece.weight_kg} kg</span>
+              )}
+            </div>
+          )}
+
+          {/* Row 5: Metadata pills */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'var(--color-line-soft)' }}>
+            {robotName && (
+              <span className="inline-flex items-center text-[12px] md:text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
+                {robotName}
+              </span>
             )}
-            {piece.material && piece.weight_kg != null && <span>·</span>}
-            {piece.weight_kg != null && (
-              <span className="shrink-0">{piece.weight_kg} kg</span>
+            {deadlineInfo && (
+              <span className={`inline-flex items-center text-[12px] md:text-[10px] font-medium ${deadlineInfo.color} bg-zinc-50 rounded-full px-2 py-0.5`}>
+                {deadlineInfo.label}
+              </span>
+            )}
+            {piece.estimated_hours != null && (
+              <span className="inline-flex items-center text-[10px] text-zinc-500 bg-zinc-50 rounded-full px-2 py-0.5">
+                {piece.estimated_hours}h
+              </span>
+            )}
+            {piece.quantity > 1 && (
+              <span className="inline-flex items-center text-[10px] text-zinc-500 bg-zinc-50 rounded-full px-2 py-0.5">
+                x{piece.quantity}
+              </span>
             )}
           </div>
-        )}
 
-        {/* Row 5: Metadata pills */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'var(--color-line-soft)' }}>
-          {robotName && (
-            <span className="inline-flex items-center text-[12px] md:text-[10px] font-semibold pill-robot rounded-full px-2 py-0.5 truncate max-w-[120px]">
-              {robotName}
-            </span>
-          )}
-          {deadlineInfo && (
-            <span className={`inline-flex items-center text-[12px] md:text-[10px] font-medium ${deadlineInfo.color} bg-zinc-50 rounded-full px-2 py-0.5`}>
-              {deadlineInfo.label}
-            </span>
-          )}
-          {piece.estimated_hours != null && (
-            <span className="inline-flex items-center text-[10px] text-zinc-500 bg-zinc-50 rounded-full px-2 py-0.5">
-              {piece.estimated_hours}h
-            </span>
-          )}
-          {piece.quantity > 1 && (
-            <span className="inline-flex items-center text-[10px] text-zinc-500 bg-zinc-50 rounded-full px-2 py-0.5">
-              x{piece.quantity}
-            </span>
+          {/* Audit footer — planned column only. Shows who last moved the
+              piece and the date of that change. Falls back to "—" when the
+              display name is unknown (user deleted, RPC missing, etc). */}
+          {showAuditFooter && auditDate && (
+            <div
+              className="mt-2 pt-1.5 text-[10px] truncate"
+              style={{ color: 'var(--color-ink-mute)', borderTop: '1px solid var(--color-line-soft)' }}
+              title={`Última mudança de estado por ${changedByName ?? "—"} a ${auditDate}`}
+            >
+              {changedByName ?? "—"} · {auditDate}
+            </div>
           )}
         </div>
-
-        {/* Audit footer — planned column only. Shows who last moved the
-            piece and the date of that change. Falls back to "—" when the
-            display name is unknown (user deleted, RPC missing, etc). */}
-        {showAuditFooter && auditDate && (
-          <div
-            className="mt-2 pt-1.5 text-[10px] truncate"
-            style={{ color: 'var(--color-ink-mute)', borderTop: '1px solid var(--color-line-soft)' }}
-            title={`Última mudança de estado por ${changedByName ?? "—"} a ${auditDate}`}
-          >
-            {changedByName ?? "—"} · {auditDate}
-          </div>
-        )}
       </div>
+
+      {/* Full-screen / centred detail sheet. Rendered inside the card so it
+          inherits the same React tree (no portal needed); the dialog is
+          fixed-positioned and full-viewport so the parent overflow doesn't
+          clip it. Only mounted while open to avoid running keydown listeners
+          for cards that aren't being inspected. Skip on overlay (drag ghost). */}
+      {detailOpen && !isOverlay && (
+        <PieceDetailSheet
+          piece={piece}
+          projectName={projectName}
+          projectColor={projectColor}
+          robotName={robotName}
+          changedByName={changedByName ?? null}
+          onClose={() => setDetailOpen(false)}
+        />
+      )}
     </div>
   );
 }

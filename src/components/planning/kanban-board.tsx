@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -71,7 +71,9 @@ import { PieceCard } from "./piece-card";
 import { KanbanFilters } from "./kanban-filters";
 import { AllocationModal } from "./allocation-modal";
 import { RobotPickerModal } from "./robot-picker-modal";
-import { MobilePieceList } from "./mobile-piece-list";
+// MobilePieceList intentionally not imported — the vertical mobile fallback
+// broke drag-and-drop between columns. Kept on disk for now in case we want
+// to revive it as an "expanded view" toggle, but it is no longer rendered.
 
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
@@ -87,6 +89,12 @@ interface KanbanBoardProps {
   robots: Robot[];
   /** auth.users.id -> display name. Used by piece-card audit footer. */
   userMap: Record<string, string>;
+  /**
+   * The active-planning-window editor. Rendered above the filters on
+   * desktop, and inside the mobile drawer on <md so it doesn't eat
+   * vertical space the operator needs for the kanban columns.
+   */
+  windowBar?: ReactNode;
 }
 
 export function KanbanBoard({
@@ -95,6 +103,7 @@ export function KanbanBoard({
   robotMap,
   robots,
   userMap,
+  windowBar,
 }: KanbanBoardProps) {
   const router = useRouter();
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
@@ -114,6 +123,34 @@ export function KanbanBoard({
   const [filterProject, setFilterProject] = useState<string>("");
   const [filterRobot, setFilterRobot] = useState<string>("");
   const [filterUrgent, setFilterUrgent] = useState(false);
+
+  // Mobile drawer for filters + planning window bar. On <md viewports the
+  // kanban needs every vertical pixel for the columns, so the filter strip
+  // and the active-window editor are tucked behind a "Filtros" toggle button
+  // in the toolbar. On md+ everything renders inline as before and the
+  // drawer is dormant.
+  const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
+
+  // Auto-close the drawer when crossing into md+ — at that breakpoint the
+  // filters are persistent so a stale open drawer would just be confusing.
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth >= 768) setFiltersDrawerOpen(false);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Lock body scroll while the drawer is open so the underlying kanban
+  // doesn't scroll behind the panel.
+  useEffect(() => {
+    if (!filtersDrawerOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [filtersDrawerOpen]);
 
   // Sensors: mouse + touch + keyboard for iPad support
   const mouseSensor = useSensor(MouseSensor, {
@@ -466,25 +503,101 @@ export function KanbanBoard({
   );
 
   const hasFilters = !!(filterProject || filterRobot || filterUrgent);
+  const activeFilterCount =
+    (filterProject ? 1 : 0) + (filterRobot ? 1 : 0) + (filterUrgent ? 1 : 0);
+
+  // Filter UI used both inline (md+) and inside the drawer (<md). Identical
+  // markup either way — the parent container changes, not the controls.
+  const filtersBlock = (
+    <KanbanFilters
+      projectOptions={projectOptions}
+      robotOptions={robotOptions}
+      filterProject={filterProject}
+      filterRobot={filterRobot}
+      filterUrgent={filterUrgent}
+      onProjectChange={setFilterProject}
+      onRobotChange={setFilterRobot}
+      onUrgentChange={setFilterUrgent}
+      onClear={() => {
+        setFilterProject("");
+        setFilterRobot("");
+        setFilterUrgent(false);
+      }}
+      hasFilters={hasFilters}
+    />
+  );
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <KanbanFilters
-        projectOptions={projectOptions}
-        robotOptions={robotOptions}
-        filterProject={filterProject}
-        filterRobot={filterRobot}
-        filterUrgent={filterUrgent}
-        onProjectChange={setFilterProject}
-        onRobotChange={setFilterRobot}
-        onUrgentChange={setFilterUrgent}
-        onClear={() => {
-          setFilterProject("");
-          setFilterRobot("");
-          setFilterUrgent(false);
-        }}
-        hasFilters={hasFilters}
-      />
+      {/* Mobile toolbar (<md): a single row with the "Filtros" toggle.
+          The planning window bar and full filter strip are hidden behind
+          the drawer so the 4-column kanban gets all the vertical space. */}
+      <div className="md:hidden mb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFiltersDrawerOpen(true)}
+          className="flex items-center gap-2 px-3 min-h-[44px] bg-white border border-zinc-300 rounded-lg shadow-sm text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 touch-manipulation"
+          aria-label="Abrir filtros e janela de planeamento"
+          aria-expanded={filtersDrawerOpen}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+          </svg>
+          <span>Filtros</span>
+          {activeFilterCount > 0 && (
+            <span
+              className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[var(--color-brand-500)] text-white text-[11px] font-bold"
+              aria-hidden="true"
+            >
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Desktop (md+) layout: planning window bar + filter strip inline. */}
+      <div className="hidden md:block">
+        {windowBar && <div className="mb-4">{windowBar}</div>}
+        {filtersBlock}
+      </div>
+
+      {/* Mobile drawer — slide-in from the right with backdrop. Mirrors
+          the unplanned-sidebar pattern so the operator sees a familiar
+          interaction. */}
+      {filtersDrawerOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          onClick={() => setFiltersDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`md:hidden fixed top-0 right-0 z-40 w-[320px] max-w-[85vw] h-[100dvh] bg-zinc-50 border-l border-zinc-200 flex flex-col shadow-xl transform transition-transform duration-200 ease-out ${
+          filtersDrawerOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+        aria-hidden={!filtersDrawerOpen}
+        aria-label="Filtros e janela de planeamento"
+      >
+        <header className="px-3 py-2 border-b border-zinc-200 bg-white flex-shrink-0 flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold text-zinc-700 uppercase tracking-wider">
+            Filtros e janela
+          </h2>
+          <button
+            type="button"
+            onClick={() => setFiltersDrawerOpen(false)}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 touch-manipulation"
+            aria-label="Fechar filtros"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto p-3 space-y-4">
+          {windowBar}
+          {filtersBlock}
+        </div>
+      </aside>
 
       <DndContext
         sensors={sensors}
@@ -493,10 +606,14 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {/* Desktop: 4-column kanban with horizontal scroll. lg breakpoint
-            (1024px) is the cutoff — anything narrower (phone, portrait
-            iPad) gets the vertical mobile list below. */}
-        <div className="hidden lg:flex flex-1 gap-5 overflow-x-auto pb-4 min-h-0 scroll-smooth px-1">
+        {/* 4-column kanban — always horizontal so drag-and-drop between
+            columns works on phone + iPad. Mobile (<md): columns share viewport
+            equally with flex-1 (no horizontal scroll on a 393px iPhone, ~92px
+            per column). md+: fixed-width columns with horizontal scroll for
+            tablet/desktop. The MobilePieceList vertical fallback was removed
+            because the operator could not drag between columns when they were
+            stacked vertically. */}
+        <div className="flex flex-1 gap-1 md:gap-5 md:overflow-x-auto pb-4 min-h-0 scroll-smooth px-0 md:px-1">
           {COLUMNS.map((col) => (
             <KanbanColumn
               key={col.id}
@@ -542,22 +659,6 @@ export function KanbanBoard({
               })}
             </KanbanColumn>
           ))}
-        </div>
-
-        {/* Mobile / portrait tablet: vertical list of collapsible status
-            sections. Shares activeId/overId state with desktop so the
-            DragOverlay below renders in both layouts. */}
-        <div className="flex lg:hidden flex-1 flex-col min-h-0">
-          <MobilePieceList
-            columnPieces={columnPieces}
-            projectMap={projectMap}
-            robotMap={robotMap}
-            userMap={userMap}
-            activeId={activeId}
-            overId={overId}
-            onDeletePiece={handleDeletePiece}
-            onReorder={handleReorder}
-          />
         </div>
 
         <DragOverlay dropAnimation={null}>
