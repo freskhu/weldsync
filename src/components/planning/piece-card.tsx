@@ -328,18 +328,19 @@ export function PieceCard({
           dates, audit, etc.). The drag handle and action buttons stop
           propagation so they keep working as before. */}
       <div
-        className="pl-10 md:pl-8 pr-1.5 md:pr-3 py-1.5 md:py-3 cursor-pointer"
+        className="pl-10 md:pl-8 pr-2 md:pr-3 py-2 md:py-3 cursor-pointer"
         onClick={isOverlay ? undefined : handleBodyClick}
       >
         {/* Row 1: Reference + urgency + program status. Always visible —
-            this is the only field that survives on the mobile compact card. */}
+            with the 2x2 mobile grid columns are ~196px wide so we can
+            afford slightly larger type than the old 4-up layout. */}
         <div className="flex items-center justify-between gap-1 md:gap-2">
-          <span className="text-[11px] md:text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
+          <span className="text-[12px] md:text-[12.5px] font-bold tracking-tight font-mono truncate" style={{ color: 'var(--color-ink)' }}>
             {piece.reference}
           </span>
           <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
             {piece.urgent && (
-              <svg className="w-3 h-3 md:w-4 md:h-4 text-[var(--color-danger)] shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-label="Urgente">
+              <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-[var(--color-danger)] shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-label="Urgente">
                 <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
             )}
@@ -353,8 +354,35 @@ export function PieceCard({
           </div>
         </div>
 
-        {/* Everything below this point is hidden on mobile (<md). Tapping
-            the card opens the detail sheet for the full info. */}
+        {/* Phone-only secondary row (<md, ~196px quadrant in the 2x2 grid).
+            Now that columns are wider than the old 4-up layout we can fit
+            project name + a single metric line without crowding the card.
+            The full detail sheet still opens on tap for everything else
+            (material, robot, audit, etc.). Hidden from md+ where the rich
+            desktop block below takes over (covers iPad portrait in 2x2 grid
+            AND iPad landscape/desktop in horizontal row). */}
+        <div className="md:hidden mt-1">
+          <p className="text-[11px] truncate" style={{ color: 'var(--color-ink-soft)' }}>
+            {projectName}
+          </p>
+          {(piece.weight_kg != null || deadlineInfo) && (
+            <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px]" style={{ color: 'var(--color-ink-mute)' }}>
+              {piece.weight_kg != null && (
+                <span className="shrink-0">{piece.weight_kg} kg</span>
+              )}
+              {piece.weight_kg != null && deadlineInfo && <span>·</span>}
+              {deadlineInfo && (
+                <span className={`${deadlineInfo.color} truncate`}>{deadlineInfo.label}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Everything below this point is hidden on phone (<md). On md+
+            (iPad portrait at ~384px quadrant + larger) the rich card with
+            description, project, material/weight, metadata pills, and audit
+            footer renders inline. Tapping the card body still opens the
+            detail sheet on every viewport. */}
         <div className="hidden md:block">
           {/* Row 2: Piece description (what we're welding) */}
           {piece.description && (

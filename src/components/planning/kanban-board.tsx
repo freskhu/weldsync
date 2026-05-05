@@ -606,14 +606,14 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {/* 4-column kanban — always horizontal so drag-and-drop between
-            columns works on phone + iPad. Mobile (<md): columns share viewport
-            equally with flex-1 (no horizontal scroll on a 393px iPhone, ~92px
-            per column). md+: fixed-width columns with horizontal scroll for
-            tablet/desktop. The MobilePieceList vertical fallback was removed
-            because the operator could not drag between columns when they were
-            stacked vertically. */}
-        <div className="flex flex-1 gap-1 md:gap-5 md:overflow-x-auto pb-4 min-h-0 scroll-smooth px-0 md:px-1">
+        {/* 4-column kanban. Mobile (<lg): 2x2 grid — Backlog/Planeados on
+            top row, Programada/Finalizados on bottom. Each quadrant is ~196px
+            wide on a 393px viewport, double the 4-up horizontal layout. Each
+            column has its own internal scroll, drag works across all four
+            quadrants because DndContext wraps the whole grid and the same
+            droppable ids are still in the DOM. lg+: switch back to horizontal
+            row with fixed-width columns and horizontal scroll. */}
+        <div className="grid grid-cols-2 grid-rows-2 gap-1.5 lg:flex lg:flex-row lg:gap-5 lg:overflow-x-auto flex-1 min-h-0 pb-4 scroll-smooth px-0 lg:px-1">
           {COLUMNS.map((col) => (
             <KanbanColumn
               key={col.id}
