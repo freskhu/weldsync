@@ -71,7 +71,9 @@ import { PieceCard } from "./piece-card";
 import { KanbanFilters } from "./kanban-filters";
 import { AllocationModal } from "./allocation-modal";
 import { RobotPickerModal } from "./robot-picker-modal";
-import { MobilePieceList } from "./mobile-piece-list";
+// MobilePieceList intentionally not imported — the vertical mobile fallback
+// broke drag-and-drop between columns. Kept on disk for now in case we want
+// to revive it as an "expanded view" toggle, but it is no longer rendered.
 
 const COLUMNS: { id: PieceStatus; label: string }[] = [
   { id: "backlog", label: "Backlog" },
@@ -493,10 +495,14 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {/* Desktop: 4-column kanban with horizontal scroll. lg breakpoint
-            (1024px) is the cutoff — anything narrower (phone, portrait
-            iPad) gets the vertical mobile list below. */}
-        <div className="hidden lg:flex flex-1 gap-5 overflow-x-auto pb-4 min-h-0 scroll-smooth px-1">
+        {/* 4-column kanban — always horizontal so drag-and-drop between
+            columns works on phone + iPad. Mobile (<md): columns share viewport
+            equally with flex-1 (no horizontal scroll on a 393px iPhone, ~92px
+            per column). md+: fixed-width columns with horizontal scroll for
+            tablet/desktop. The MobilePieceList vertical fallback was removed
+            because the operator could not drag between columns when they were
+            stacked vertically. */}
+        <div className="flex flex-1 gap-1 md:gap-5 md:overflow-x-auto pb-4 min-h-0 scroll-smooth px-0 md:px-1">
           {COLUMNS.map((col) => (
             <KanbanColumn
               key={col.id}
@@ -542,22 +548,6 @@ export function KanbanBoard({
               })}
             </KanbanColumn>
           ))}
-        </div>
-
-        {/* Mobile / portrait tablet: vertical list of collapsible status
-            sections. Shares activeId/overId state with desktop so the
-            DragOverlay below renders in both layouts. */}
-        <div className="flex lg:hidden flex-1 flex-col min-h-0">
-          <MobilePieceList
-            columnPieces={columnPieces}
-            projectMap={projectMap}
-            robotMap={robotMap}
-            userMap={userMap}
-            activeId={activeId}
-            overId={overId}
-            onDeletePiece={handleDeletePiece}
-            onReorder={handleReorder}
-          />
         </div>
 
         <DragOverlay dropAnimation={null}>
