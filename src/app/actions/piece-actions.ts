@@ -553,9 +553,11 @@ async function allocatePieceCore(
     robot_id: robotId,
     scheduled_date: date,
     scheduled_period: period,
+    // Defensive: priority lives only on the planned column. Always clear on
+    // allocate to preserve the invariant `status='planned' ⇒ priority IS NOT NULL`.
+    priority: null,
     ...statusAuditPatch(userId),
   };
-  if (before.status === "planned") patch.priority = null;
 
   let piece;
   try {

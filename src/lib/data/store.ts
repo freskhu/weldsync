@@ -258,12 +258,22 @@ export async function getUserDisplayNames(
 
 /**
  * Moves a piece to a new status. Returns the updated piece or null if not found.
+ *
+ * Enforces the planned-priority invariant defensively: if the new status is
+ * not 'planned', priority is cleared. Callers landing pieces in 'planned'
+ * should use `transitionToPlanned()` instead so the priority slot is assigned.
+ *
+ * Currently unused by application code (Server Actions / route handlers build
+ * their patches inline); kept for ad-hoc tooling and future callers.
  */
 export async function movePiece(
   pieceId: string,
   newStatus: Piece["status"]
 ): Promise<Piece | null> {
-  return updatePiece(pieceId, { status: newStatus });
+  if (newStatus === "planned") {
+    return transitionToPlanned(pieceId);
+  }
+  return updatePiece(pieceId, { status: newStatus, priority: null });
 }
 
 /**
@@ -412,7 +422,8 @@ export async function swapPlannedPriorities(
 
 /**
  * Allocates a piece to a robot on a specific date and period.
- * Sets status to 'allocated'.
+ * Sets status to 'allocated'. Clears priority to preserve the
+ * planned-priority invariant (priority lives only on the planned column).
  */
 export async function allocatePiece(
   pieceId: string,
@@ -425,11 +436,13 @@ export async function allocatePiece(
     robot_id: robotId,
     scheduled_date: date,
     scheduled_period: period,
+    priority: null,
   });
 }
 
 /**
  * Removes allocation from a piece, returning it to backlog.
+ * Clears priority to preserve the planned-priority invariant.
  */
 export async function deallocatePiece(pieceId: string): Promise<Piece | null> {
   return updatePiece(pieceId, {
@@ -437,6 +450,7 @@ export async function deallocatePiece(pieceId: string): Promise<Piece | null> {
     robot_id: null,
     scheduled_date: null,
     scheduled_period: null,
+    priority: null,
   });
 }
 
