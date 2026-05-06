@@ -113,8 +113,19 @@ export async function createPieceAction(
   const userId = await getCurrentUserId(supabase);
 
   // If creating directly into "planned", grab the next priority slot.
-  const priority =
-    result.data.status === "planned" ? await nextPlannedPriority() : null;
+  // INVARIANT: every piece with status='planned' must have a non-null priority.
+  let priority: number | null = null;
+  if (result.data.status === "planned") {
+    try {
+      priority = await nextPlannedPriority();
+    } catch (err) {
+      console.error(
+        "[createPieceAction] nextPlannedPriority failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+      return { success: false, error: "Falha ao calcular prioridade." };
+    }
+  }
 
   let created;
   try {
@@ -542,9 +553,11 @@ async function allocatePieceCore(
     robot_id: robotId,
     scheduled_date: date,
     scheduled_period: period,
+    // Defensive: priority lives only on the planned column. Always clear on
+    // allocate to preserve the invariant `status='planned' ⇒ priority IS NOT NULL`.
+    priority: null,
     ...statusAuditPatch(userId),
   };
-  if (before.status === "planned") patch.priority = null;
 
   let piece;
   try {
@@ -875,23 +888,26 @@ async function reorderPlanned(
   try {
     if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
-    console.log("[reorderPlanned] start", { pieceId, direction });
-
     const target = await getPieceById(pieceId);
     if (!target) return { success: false, error: "Peca nao encontrada." };
     if (target.status !== "planned") {
       return { success: false, error: "Peca nao esta na coluna Planeados." };
     }
     if (target.priority == null) {
-      console.log("[reorderPlanned] backfill priority");
-      await dbUpdatePiece(pieceId, { priority: await nextPlannedPriority() });
-      try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
-      return { success: true };
+      // Invariant: status='planned' ⇒ priority IS NOT NULL.
+      // Hitting this branch is a bug, not a recoverable state.
+      console.error(
+        "[reorderPlanned] invariant violated: planned piece without priority",
+        { pieceId }
+      );
+      return {
+        success: false,
+        error: "invariant violated: planned piece without priority",
+      };
     }
 
     const neighbour = await getPlannedNeighbour(pieceId, direction);
     if (!neighbour) {
-      console.log("[reorderPlanned] no neighbour, boundary");
       try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
       return { success: true };
     }
@@ -901,7 +917,6 @@ async function reorderPlanned(
       return { success: false, error: "Falha ao reordenar." };
     }
 
-    console.log("[reorderPlanned] swap done");
     try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
     return { success: true };
   } catch (err) {

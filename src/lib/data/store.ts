@@ -258,60 +258,22 @@ export async function getUserDisplayNames(
 
 /**
  * Moves a piece to a new status. Returns the updated piece or null if not found.
+ *
+ * Enforces the planned-priority invariant defensively: if the new status is
+ * not 'planned', priority is cleared. Callers landing pieces in 'planned'
+ * should use `transitionToPlanned()` instead so the priority slot is assigned.
+ *
+ * Currently unused by application code (Server Actions / route handlers build
+ * their patches inline); kept for ad-hoc tooling and future callers.
  */
 export async function movePiece(
   pieceId: string,
   newStatus: Piece["status"]
 ): Promise<Piece | null> {
-  return updatePiece(pieceId, { status: newStatus });
-}
-
-/**
- * Backfills sequential `priority` (1..N) on every piece in the "planned"
- * column, in the same visual order the kanban renders. Used the first time
- * the planner taps an arrow on a piece that has no priority yet — without
- * this, `nextPlannedPriority` would push the piece to MAX+1 (the end of the
- * column) and the visible move would be 4+ slots instead of 1.
- *
- * Visual order matches `KanbanBoard.sortedPieces`:
- *   1. existing priority asc (nulls last)
- *   2. urgent first
- *   3. scheduled_date asc (nulls last)
- *
- * Idempotent: pieces that already match the computed slot are not rewritten.
- */
-export async function backfillPlannedPriorities(): Promise<void> {
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("piece")
-    .select("*")
-    .eq("status", "planned");
-  if (error) throw new Error(`backfillPlannedPriorities: ${error.message}`);
-  if (!data?.length) return;
-
-  const sorted = [...data].sort((a, b) => {
-    const pa = a.priority;
-    const pb = b.priority;
-    if (pa != null && pb != null) return pa - pb;
-    if (pa != null) return -1;
-    if (pb != null) return 1;
-    if (a.urgent && !b.urgent) return -1;
-    if (!a.urgent && b.urgent) return 1;
-    const da = a.scheduled_date;
-    const db = b.scheduled_date;
-    if (da && db) return da.localeCompare(db);
-    if (da) return -1;
-    if (db) return 1;
-    return 0;
-  });
-
-  await Promise.all(
-    sorted.map((p, i) =>
-      p.priority === i + 1
-        ? Promise.resolve(null)
-        : updatePiece(p.id, { priority: i + 1 })
-    )
-  );
+  if (newStatus === "planned") {
+    return transitionToPlanned(pieceId);
+  }
+  return updatePiece(pieceId, { status: newStatus, priority: null });
 }
 
 /**
@@ -335,6 +297,27 @@ export async function nextPlannedPriority(): Promise<number> {
   if (error) throw new Error(`nextPlannedPriority: ${error.message}`);
   const max = data?.priority ?? 0;
   return max + 1;
+}
+
+/**
+ * Transitions a piece into the "planned" column with a fresh MAX+1 priority
+ * slot. Single source of truth for any caller that needs to land a piece in
+ * Planeados — guarantees the invariant `status='planned' ⇒ priority IS NOT NULL`.
+ *
+ * Use this instead of calling `updatePiece(..., { status: 'planned' })`
+ * directly. Caller is responsible for any extra patch fields (audit stamps,
+ * cleanup of robot/scheduled fields) — combine via the optional `extraPatch`.
+ */
+export async function transitionToPlanned(
+  pieceId: string,
+  extraPatch: Partial<Omit<Piece, "id" | "project_id" | "created_at" | "updated_at" | "status" | "priority">> = {}
+): Promise<Piece | null> {
+  const priority = await nextPlannedPriority();
+  return updatePiece(pieceId, {
+    ...extraPatch,
+    status: "planned",
+    priority,
+  });
 }
 
 /**
@@ -391,7 +374,8 @@ export async function swapPlannedPriorities(
 
 /**
  * Allocates a piece to a robot on a specific date and period.
- * Sets status to 'allocated'.
+ * Sets status to 'allocated'. Clears priority to preserve the
+ * planned-priority invariant (priority lives only on the planned column).
  */
 export async function allocatePiece(
   pieceId: string,
@@ -404,11 +388,13 @@ export async function allocatePiece(
     robot_id: robotId,
     scheduled_date: date,
     scheduled_period: period,
+    priority: null,
   });
 }
 
 /**
  * Removes allocation from a piece, returning it to backlog.
+ * Clears priority to preserve the planned-priority invariant.
  */
 export async function deallocatePiece(pieceId: string): Promise<Piece | null> {
   return updatePiece(pieceId, {
@@ -416,6 +402,7 @@ export async function deallocatePiece(pieceId: string): Promise<Piece | null> {
     robot_id: null,
     scheduled_date: null,
     scheduled_period: null,
+    priority: null,
   });
 }
 

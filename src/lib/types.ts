@@ -77,9 +77,9 @@ export interface Piece {
   program_id: string | null;
   position: number | null;
   /**
-   * Ordering rank within the "programmed" kanban column.
-   * NULL when status != 'programmed'. Lower number = higher in the list.
-   * Assigned as MAX(priority)+1 on entry to programmed; cleared on exit.
+   * Ordering rank within the "planned" kanban column.
+   * NULL when status != 'planned'. Lower number = higher in the list.
+   * Assigned as MAX(priority)+1 on entry to planned; cleared on exit.
    */
   priority: number | null;
   /** auth.users.id of the user who last changed the piece status. */
