@@ -113,8 +113,19 @@ export async function createPieceAction(
   const userId = await getCurrentUserId(supabase);
 
   // If creating directly into "planned", grab the next priority slot.
-  const priority =
-    result.data.status === "planned" ? await nextPlannedPriority() : null;
+  // INVARIANT: every piece with status='planned' must have a non-null priority.
+  let priority: number | null = null;
+  if (result.data.status === "planned") {
+    try {
+      priority = await nextPlannedPriority();
+    } catch (err) {
+      console.error(
+        "[createPieceAction] nextPlannedPriority failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+      return { success: false, error: "Falha ao calcular prioridade." };
+    }
+  }
 
   let created;
   try {

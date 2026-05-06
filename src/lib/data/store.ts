@@ -338,6 +338,27 @@ export async function nextPlannedPriority(): Promise<number> {
 }
 
 /**
+ * Transitions a piece into the "planned" column with a fresh MAX+1 priority
+ * slot. Single source of truth for any caller that needs to land a piece in
+ * Planeados — guarantees the invariant `status='planned' ⇒ priority IS NOT NULL`.
+ *
+ * Use this instead of calling `updatePiece(..., { status: 'planned' })`
+ * directly. Caller is responsible for any extra patch fields (audit stamps,
+ * cleanup of robot/scheduled fields) — combine via the optional `extraPatch`.
+ */
+export async function transitionToPlanned(
+  pieceId: string,
+  extraPatch: Partial<Omit<Piece, "id" | "project_id" | "created_at" | "updated_at" | "status" | "priority">> = {}
+): Promise<Piece | null> {
+  const priority = await nextPlannedPriority();
+  return updatePiece(pieceId, {
+    ...extraPatch,
+    status: "planned",
+    priority,
+  });
+}
+
+/**
  * Returns the immediate neighbour of `piece` in the planned column,
  * either above (smaller priority) or below (larger priority). Null if the
  * piece is already at the boundary.
