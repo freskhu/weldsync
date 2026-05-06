@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getPieceById,
-  updatePiece,
-  nextPlannedPriority,
+  backfillPlannedPriorities,
   getPlannedNeighbour,
   swapPlannedPriorities,
 } from "@/lib/data/store";
@@ -24,7 +23,7 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "invalid direction" }, { status: 400 });
     }
 
-    const target = await getPieceById(id);
+    let target = await getPieceById(id);
     if (!target) {
       return NextResponse.json({ ok: false, error: "piece not found" }, { status: 404 });
     }
@@ -35,10 +34,20 @@ export async function POST(
       );
     }
 
+    // First click on a priority-less piece: assign sequential priorities to
+    // every planned piece in their current visual order, then proceed with
+    // the swap. Without this we'd push the target to MAX+1 (the end) and the
+    // visible move would be N slots instead of 1.
     if (target.priority == null) {
-      const next = await nextPlannedPriority();
-      await updatePiece(id, { priority: next });
-      return NextResponse.json({ ok: true, backfilled: next });
+      await backfillPlannedPriorities();
+      const refreshed = await getPieceById(id);
+      if (!refreshed || refreshed.priority == null) {
+        return NextResponse.json(
+          { ok: false, error: "backfill did not assign priority" },
+          { status: 500 }
+        );
+      }
+      target = refreshed;
     }
 
     const neighbour = await getPlannedNeighbour(id, direction);
