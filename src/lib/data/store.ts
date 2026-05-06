@@ -351,22 +351,29 @@ export async function getPlannedNeighbour(
 }
 
 /**
- * Atomically swaps the `priority` field between two pieces. Implemented as
- * two sequential UPDATEs since `priority` has no UNIQUE constraint, so a
- * temporary "duplicate" between the two writes is harmless.
+ * Atomically swaps the `priority` field between two pieces using the
+ * `swap_planned_priorities` PL/pgSQL function (migration 00016). The
+ * function runs in a single transaction with FOR UPDATE locks on both
+ * rows, so a crash mid-swap or two concurrent swaps can't leave duplicate
+ * priorities — which is what previously polluted production.
  *
- * Returns both pieces with their new priorities, or null if either was not
- * found / not planned.
+ * Returns both pieces re-fetched with their new priorities, or null if
+ * the RPC failed or either piece is not planned with a priority.
  */
 export async function swapPlannedPriorities(
   pieceA: Piece,
   pieceB: Piece
 ): Promise<{ a: Piece; b: Piece } | null> {
   if (pieceA.priority == null || pieceB.priority == null) return null;
-  const a = await updatePiece(pieceA.id, { priority: pieceB.priority });
-  if (!a) return null;
-  const b = await updatePiece(pieceB.id, { priority: pieceA.priority });
-  if (!b) return null;
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.rpc("swap_planned_priorities", {
+    a_id: pieceA.id,
+    b_id: pieceB.id,
+  });
+  if (error) throw new Error(`swapPlannedPriorities: ${error.message}`);
+  const a = await getPieceById(pieceA.id);
+  const b = await getPieceById(pieceB.id);
+  if (!a || !b) return null;
   return { a, b };
 }
 
