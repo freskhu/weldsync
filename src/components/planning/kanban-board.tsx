@@ -126,6 +126,11 @@ export function KanbanBoard({
   // diagnose the Backlog→Planeados persistence bug.
   const [debugError, setDebugError] = useState<string | null>(null);
 
+  // Reorder loading state — the id of the piece whose arrow is currently
+  // being processed by the server. Disables both arrows on that card so
+  // a fast double-tap can't fire two overlapping reorder requests.
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
+
   // Filters
   const [filterProject, setFilterProject] = useState<string>("");
   const [filterRobot, setFilterRobot] = useState<string>("");
@@ -455,58 +460,30 @@ export function KanbanBoard({
 
   /**
    * Reorder a piece up/down within the "planned" column.
-   * Optimistic: swap priority locally, then call the server. Revert on failure.
-   * The server is the source of truth for the actual numeric values, but the
-   * relative order is what the user cares about — so swapping locally is safe.
+   *
+   * Server-first: hit the API, then `router.refresh()` to pull the
+   * authoritative ordering. No optimistic update — the previous local-swap
+   * version was a vector for "magnitude variable" bugs (e.g. when the
+   * server's MAX+1 strategy disagreed with the client's swap, the user saw
+   * the piece move N slots instead of one). With the planned-priority
+   * invariant in place, the server swap is always exactly one slot, so a
+   * loading state is enough.
    */
   const handleReorder = useCallback(
     async (pieceId: string, direction: "up" | "down") => {
-      const target = pieces.find((p) => p.id === pieceId);
-      if (!target || target.status !== "planned") return;
-      if (target.priority == null) {
-        // No local swap possible — just hit the server (it will backfill).
+      setReorderingId(pieceId);
+      try {
         const result = await reorderPieceREST(pieceId, direction);
         if (!result.success) {
           console.error("Failed to reorder piece:", result.error);
-        } else {
-          router.refresh();
+          return;
         }
-        return;
-      }
-
-      // Find neighbour in the sorted planned column.
-      const planned = pieces
-        .filter(
-          (p) => p.status === "planned" && p.priority != null
-        )
-        .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
-      const idx = planned.findIndex((p) => p.id === pieceId);
-      if (idx === -1) return;
-      const neighbourIdx = direction === "up" ? idx - 1 : idx + 1;
-      if (neighbourIdx < 0 || neighbourIdx >= planned.length) return; // boundary
-      const neighbour = planned[neighbourIdx];
-      if (neighbour.priority == null) return;
-
-      const previousPieces = [...pieces];
-      const targetPriority = target.priority;
-      const neighbourPriority = neighbour.priority;
-      setPieces((prev) =>
-        prev.map((p) => {
-          if (p.id === target.id) return { ...p, priority: neighbourPriority };
-          if (p.id === neighbour.id) return { ...p, priority: targetPriority };
-          return p;
-        })
-      );
-
-      const result = await reorderPieceREST(pieceId, direction);
-      if (!result.success) {
-        setPieces(previousPieces);
-        console.error("Failed to reorder piece:", result.error);
-      } else {
         router.refresh();
+      } finally {
+        setReorderingId(null);
       }
     },
-    [pieces, router]
+    [router]
   );
 
   const hasFilters = !!(filterProject || filterRobot || filterUrgent);
@@ -650,6 +627,7 @@ export function KanbanBoard({
                     showReorderArrows={isPlanned}
                     canMoveUp={isPlanned && idx > 0}
                     canMoveDown={isPlanned && idx < arr.length - 1}
+                    isReordering={reorderingId === piece.id}
                     onMoveUp={
                       isPlanned
                         ? () => handleReorder(piece.id, "up")

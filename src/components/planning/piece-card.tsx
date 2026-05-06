@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import type { Piece } from "@/lib/types";
 import {
   deletePieceAction,
@@ -28,6 +28,12 @@ interface PieceCardProps {
   canMoveDown?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  /**
+   * True while a reorder request for this piece is in flight. Disables both
+   * arrows and replaces the up arrow with a spinner so a fast double-tap
+   * can't fire two overlapping reorder requests against the server.
+   */
+  isReordering?: boolean;
   /** Display name of the user who last changed the piece status. */
   changedByName?: string | null;
 }
@@ -65,6 +71,7 @@ export function PieceCard({
   canMoveDown = false,
   onMoveUp,
   onMoveDown,
+  isReordering = false,
   changedByName,
 }: PieceCardProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -285,20 +292,26 @@ export function PieceCard({
                 type="button"
                 onClick={(e) => handleReorderClick(e, "up")}
                 onPointerDown={handleReorderPointerDown}
-                disabled={!canMoveUp}
+                disabled={!canMoveUp || isReordering}
+                aria-busy={isReordering}
                 className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
                 title="Subir prioridade"
                 aria-label={`Subir prioridade da peça ${piece.reference}`}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                </svg>
+                {isReordering ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  </svg>
+                )}
               </button>
               <button
                 type="button"
                 onClick={(e) => handleReorderClick(e, "down")}
                 onPointerDown={handleReorderPointerDown}
-                disabled={!canMoveDown}
+                disabled={!canMoveDown || isReordering}
+                aria-busy={isReordering}
                 className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md bg-[var(--color-brand-600,#2563eb)] text-white shadow-sm hover:bg-[var(--color-brand-700,#1d4ed8)] disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
                 title="Descer prioridade"
                 aria-label={`Descer prioridade da peça ${piece.reference}`}
