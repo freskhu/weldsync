@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getPieceById,
-  backfillPlannedPriorities,
   getPlannedNeighbour,
   swapPlannedPriorities,
 } from "@/lib/data/store";
@@ -9,6 +8,10 @@ import {
 /**
  * Replaces movePieceUpAction / movePieceDownAction.
  * POST /api/pieces/[id]/reorder { direction: 'up' | 'down' }
+ *
+ * Relies on the planned-priority invariant: every piece with status='planned'
+ * has a non-null priority. If that ever fails, we 500 with a loud error so
+ * the bug surfaces immediately — defensive backfill is gone on purpose.
  */
 export async function POST(
   req: NextRequest,
@@ -23,7 +26,7 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "invalid direction" }, { status: 400 });
     }
 
-    let target = await getPieceById(id);
+    const target = await getPieceById(id);
     if (!target) {
       return NextResponse.json({ ok: false, error: "piece not found" }, { status: 404 });
     }
@@ -33,21 +36,18 @@ export async function POST(
         { status: 400 }
       );
     }
-
-    // First click on a priority-less piece: assign sequential priorities to
-    // every planned piece in their current visual order, then proceed with
-    // the swap. Without this we'd push the target to MAX+1 (the end) and the
-    // visible move would be N slots instead of 1.
     if (target.priority == null) {
-      await backfillPlannedPriorities();
-      const refreshed = await getPieceById(id);
-      if (!refreshed || refreshed.priority == null) {
-        return NextResponse.json(
-          { ok: false, error: "backfill did not assign priority" },
-          { status: 500 }
-        );
-      }
-      target = refreshed;
+      console.error(
+        "[reorder] invariant violated: planned piece without priority",
+        { pieceId: id }
+      );
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "invariant violated: planned piece without priority",
+        },
+        { status: 500 }
+      );
     }
 
     const neighbour = await getPlannedNeighbour(id, direction);

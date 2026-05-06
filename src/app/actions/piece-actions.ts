@@ -888,23 +888,26 @@ async function reorderPlanned(
   try {
     if (!pieceId) return { success: false, error: "ID da peca em falta." };
 
-    console.log("[reorderPlanned] start", { pieceId, direction });
-
     const target = await getPieceById(pieceId);
     if (!target) return { success: false, error: "Peca nao encontrada." };
     if (target.status !== "planned") {
       return { success: false, error: "Peca nao esta na coluna Planeados." };
     }
     if (target.priority == null) {
-      console.log("[reorderPlanned] backfill priority");
-      await dbUpdatePiece(pieceId, { priority: await nextPlannedPriority() });
-      try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
-      return { success: true };
+      // Invariant: status='planned' ⇒ priority IS NOT NULL.
+      // Hitting this branch is a bug, not a recoverable state.
+      console.error(
+        "[reorderPlanned] invariant violated: planned piece without priority",
+        { pieceId }
+      );
+      return {
+        success: false,
+        error: "invariant violated: planned piece without priority",
+      };
     }
 
     const neighbour = await getPlannedNeighbour(pieceId, direction);
     if (!neighbour) {
-      console.log("[reorderPlanned] no neighbour, boundary");
       try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
       return { success: true };
     }
@@ -914,7 +917,6 @@ async function reorderPlanned(
       return { success: false, error: "Falha ao reordenar." };
     }
 
-    console.log("[reorderPlanned] swap done");
     try { revalidatePath("/planning"); } catch (e) { console.error("[reorderPlanned] revalidate failed:", e); }
     return { success: true };
   } catch (err) {
