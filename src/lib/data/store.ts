@@ -267,6 +267,54 @@ export async function movePiece(
 }
 
 /**
+ * Backfills sequential `priority` (1..N) on every piece in the "planned"
+ * column, in the same visual order the kanban renders. Used the first time
+ * the planner taps an arrow on a piece that has no priority yet — without
+ * this, `nextPlannedPriority` would push the piece to MAX+1 (the end of the
+ * column) and the visible move would be 4+ slots instead of 1.
+ *
+ * Visual order matches `KanbanBoard.sortedPieces`:
+ *   1. existing priority asc (nulls last)
+ *   2. urgent first
+ *   3. scheduled_date asc (nulls last)
+ *
+ * Idempotent: pieces that already match the computed slot are not rewritten.
+ */
+export async function backfillPlannedPriorities(): Promise<void> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("piece")
+    .select("*")
+    .eq("status", "planned");
+  if (error) throw new Error(`backfillPlannedPriorities: ${error.message}`);
+  if (!data?.length) return;
+
+  const sorted = [...data].sort((a, b) => {
+    const pa = a.priority;
+    const pb = b.priority;
+    if (pa != null && pb != null) return pa - pb;
+    if (pa != null) return -1;
+    if (pb != null) return 1;
+    if (a.urgent && !b.urgent) return -1;
+    if (!a.urgent && b.urgent) return 1;
+    const da = a.scheduled_date;
+    const db = b.scheduled_date;
+    if (da && db) return da.localeCompare(db);
+    if (da) return -1;
+    if (db) return 1;
+    return 0;
+  });
+
+  await Promise.all(
+    sorted.map((p, i) =>
+      p.priority === i + 1
+        ? Promise.resolve(null)
+        : updatePiece(p.id, { priority: i + 1 })
+    )
+  );
+}
+
+/**
  * Returns the next priority slot for the "planned" column.
  * MAX(priority)+1, or 1 if the column is empty.
  *
