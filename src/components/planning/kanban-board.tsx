@@ -107,6 +107,13 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const router = useRouter();
   const [pieces, setPieces] = useState<Piece[]>(initialPieces);
+  // Re-sync local state when the server payload changes (router.refresh()
+  // after a reorder/program/allocate, navigation, or revalidation). Without
+  // this the kanban shows stale priorities even though the database swap
+  // succeeded.
+  useEffect(() => {
+    setPieces(initialPieces);
+  }, [initialPieces]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
